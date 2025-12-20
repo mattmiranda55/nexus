@@ -3,21 +3,29 @@
   import { RunTinker } from '../../wailsjs/go/main/App.js';
 
   async function runCode() {
+    console.log('[Toolbar] runCode called');
     if (!$currentProject) {
+      console.log('[Toolbar] No current project selected');
       output.set('Error: Please add a Laravel project first');
       return;
     }
 
+    console.log('[Toolbar] Running code for project:', $currentProject);
+    console.log('[Toolbar] Code to execute:', $code);
     isRunning.set(true);
     output.set('');
     
     try {
+      console.log('[Toolbar] Calling RunTinker...');
       const result = await RunTinker($currentProject.path, $code);
+      console.log('[Toolbar] RunTinker returned:', result);
       output.set(result);
     } catch (err) {
+      console.error('[Toolbar] Error running tinker:', err);
       output.set(`Error: ${err}`);
     } finally {
       isRunning.set(false);
+      console.log('[Toolbar] Execution complete');
     }
   }
 

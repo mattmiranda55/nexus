@@ -4,37 +4,62 @@
   import { GetProjects, AddProject, RemoveProject, SelectDirectory } from '../../wailsjs/go/main/App.js';
 
   onMount(async () => {
-    const savedProjects = await GetProjects();
-    projects.set(savedProjects || []);
-    if (savedProjects && savedProjects.length > 0) {
-      currentProject.set(savedProjects[0]);
+    console.log('[Sidebar] Component mounted, loading projects...');
+    try {
+      const savedProjects = await GetProjects();
+      console.log('[Sidebar] GetProjects returned:', savedProjects);
+      projects.set(savedProjects || []);
+      if (savedProjects && savedProjects.length > 0) {
+        console.log('[Sidebar] Setting current project to:', savedProjects[0]);
+        currentProject.set(savedProjects[0]);
+      }
+    } catch (err) {
+      console.error('[Sidebar] Error loading projects:', err);
     }
   });
 
   async function addProject() {
+    console.log('[Sidebar] addProject called');
     try {
+      console.log('[Sidebar] Opening directory picker...');
       const path = await SelectDirectory();
+      console.log('[Sidebar] SelectDirectory returned:', path);
       
-      if (!path) return;
+      if (!path) {
+        console.log('[Sidebar] No path selected, aborting');
+        return;
+      }
       
-      const name = prompt('Enter project name:', path.split('/').pop());
-      if (!name) return;
+      // Auto-use folder name as project name
+      const name = path.split('/').pop();
+      console.log('[Sidebar] Using folder name as project name:', name);
 
+      console.log('[Sidebar] Calling AddProject with name:', name, 'path:', path);
       const project = await AddProject(name, path);
+      console.log('[Sidebar] AddProject returned:', project);
       projects.update(p => [...p, project]);
       currentProject.set(project);
+      console.log('[Sidebar] Project added successfully');
     } catch (err) {
+      console.error('[Sidebar] Error in addProject:', err);
       alert(err);
     }
   }
 
   async function removeProject(e, project) {
     e.stopPropagation();
+    console.log('[Sidebar] removeProject called for:', project);
     if (confirm(`Remove "${project.name}" from projects?`)) {
-      await RemoveProject(project.id);
-      projects.update(p => p.filter(pr => pr.id !== project.id));
-      if ($currentProject?.id === project.id) {
-        currentProject.set($projects[0] || null);
+      try {
+        console.log('[Sidebar] Calling RemoveProject with id:', project.id);
+        await RemoveProject(project.id);
+        console.log('[Sidebar] RemoveProject completed');
+        projects.update(p => p.filter(pr => pr.id !== project.id));
+        if ($currentProject?.id === project.id) {
+          currentProject.set($projects[0] || null);
+        }
+      } catch (err) {
+        console.error('[Sidebar] Error removing project:', err);
       }
     }
   }

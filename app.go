@@ -2,11 +2,11 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,7 +41,9 @@ func NewApp() *App {
 // startup is called when the app starts
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	log.Println("[Startup] App starting...")
 	a.loadProjects()
+	log.Printf("[Startup] Loaded %d projects", len(a.projects))
 }
 
 // getConfigPath returns the path to the config file
@@ -54,17 +56,31 @@ func (a *App) getConfigPath() string {
 
 // loadProjects loads projects from config file
 func (a *App) loadProjects() {
-	data, err := os.ReadFile(a.getConfigPath())
+	configPath := a.getConfigPath()
+	log.Printf("[LoadProjects] Reading from: %s", configPath)
+	data, err := os.ReadFile(configPath)
 	if err != nil {
+		log.Printf("[LoadProjects] Error reading config: %v", err)
 		return
 	}
-	json.Unmarshal(data, &a.projects)
+	if err := json.Unmarshal(data, &a.projects); err != nil {
+		log.Printf("[LoadProjects] Error parsing JSON: %v", err)
+	}
 }
 
 // saveProjects saves projects to config file
 func (a *App) saveProjects() {
-	data, _ := json.MarshalIndent(a.projects, "", "  ")
-	os.WriteFile(a.getConfigPath(), data, 0644)
+	configPath := a.getConfigPath()
+	data, err := json.MarshalIndent(a.projects, "", "  ")
+	if err != nil {
+		log.Printf("[SaveProjects] Error marshaling JSON: %v", err)
+		return
+	}
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		log.Printf("[SaveProjects] Error writing config: %v", err)
+		return
+	}
+	log.Printf("[SaveProjects] Saved %d projects to: %s", len(a.projects), configPath)
 }
 
 // GetProjects returns all saved projects
@@ -76,16 +92,27 @@ func (a *App) GetProjects() []Project {
 
 // SelectDirectory opens a directory picker dialog
 func (a *App) SelectDirectory() (string, error) {
-	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+	log.Println("[SelectDirectory] Opening directory picker...")
+	path, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "Select Laravel Project",
 	})
+	if err != nil {
+		log.Printf("[SelectDirectory] Error: %v", err)
+		return "", err
+	}
+	log.Printf("[SelectDirectory] Selected: %s", path)
+	return path, nil
 }
 
 // AddProject adds a new Laravel project
 func (a *App) AddProject(name, path string) (Project, error) {
+	log.Printf("[AddProject] Adding project: name=%s, path=%s", name, path)
+
 	// Validate it's a Laravel project
 	artisanPath := filepath.Join(path, "artisan")
+	log.Printf("[AddProject] Checking for artisan at: %s", artisanPath)
 	if _, err := os.Stat(artisanPath); os.IsNotExist(err) {
+		log.Printf("[AddProject] Error: artisan not found at %s", artisanPath)
 		return Project{}, fmt.Errorf("not a valid Laravel project: artisan file not found")
 	}
 
@@ -99,114 +126,116 @@ func (a *App) AddProject(name, path string) (Project, error) {
 	}
 	a.projects = append(a.projects, project)
 	a.saveProjects()
+	log.Printf("[AddProject] Successfully added project: %+v", project)
 	return project, nil
 }
 
 // RemoveProject removes a project by ID
 func (a *App) RemoveProject(id string) {
+	log.Printf("[RemoveProject] Removing project with ID: %s", id)
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	for i, p := range a.projects {
 		if p.ID == id {
+			log.Printf("[RemoveProject] Found project: %+v", p)
 			a.projects = append(a.projects[:i], a.projects[i+1:]...)
 			break
 		}
 	}
 	a.saveProjects()
+	log.Printf("[RemoveProject] Project removed, %d projects remaining", len(a.projects))
 }
 
 // RunTinker executes code through php artisan tinker
 func (a *App) RunTinker(projectPath, code string) string {
+	log.Printf("[RunTinker] Starting execution for project: %s", projectPath)
+	log.Printf("[RunTinker] Code to execute:\n%s", code)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	// Verify project path
 	artisanPath := filepath.Join(projectPath, "artisan")
 	if _, err := os.Stat(artisanPath); os.IsNotExist(err) {
+		log.Printf("[RunTinker] Error: Invalid project path, artisan not found at %s", artisanPath)
 		return "Error: Invalid Laravel project path"
 	}
 
-	// Write code to temp file (without <?php tag as tinker doesn't need it)
+	// Clean code (remove <?php tag as tinker doesn't need it)
 	cleanCode := strings.TrimPrefix(strings.TrimSpace(code), "<?php")
 	cleanCode = strings.TrimSpace(cleanCode)
+	log.Printf("[RunTinker] Cleaned code: %s", cleanCode)
 
-	// Run tinker with the code file
-	cmd := exec.CommandContext(ctx, "php", "artisan", "tinker", "--execute", cleanCode)
+	// Write code to a temp file for more reliable execution
+	tmpFile, err := os.CreateTemp("", "tinker-*.php")
+	if err != nil {
+		log.Printf("[RunTinker] Error creating temp file: %v", err)
+		return fmt.Sprintf("Error: %s", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// Write the code to temp file (no <?php tag - tinker doesn't want it)
+	tmpFile.WriteString(cleanCode + "\n")
+	tmpFile.Close()
+	log.Printf("[RunTinker] Wrote code to temp file: %s", tmpFile.Name())
+
+	// Run tinker with the temp file using shell piping
+	shellCmd := fmt.Sprintf("cat %s | php artisan tinker 2>&1", tmpFile.Name())
+	cmd := exec.CommandContext(ctx, "bash", "-c", shellCmd)
 	cmd.Dir = projectPath
+	log.Printf("[RunTinker] Running command: %s", shellCmd)
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-
-	// If --execute doesn't work, try piping to tinker
-	if err != nil || (stdout.Len() == 0 && stderr.Len() == 0) {
-		cmd = exec.CommandContext(ctx, "php", "artisan", "tinker")
-		cmd.Dir = projectPath
-
-		stdin, err := cmd.StdinPipe()
-		if err != nil {
-			return fmt.Sprintf("Error: %s", err)
-		}
-
-		stdout.Reset()
-		stderr.Reset()
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-
-		if err := cmd.Start(); err != nil {
-			return fmt.Sprintf("Error starting tinker: %s", err)
-		}
-
-		// Write code and exit command
-		io.WriteString(stdin, cleanCode+"\n")
-		io.WriteString(stdin, "exit\n")
-		stdin.Close()
-
-		cmd.Wait()
-	}
-
-	var result strings.Builder
-
-	// Parse and clean output
-	output := stdout.String()
-	// Remove tinker prompt artifacts
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		// Skip prompt lines and empty lines
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, ">>>") ||
-			strings.HasPrefix(trimmed, "...") ||
-			trimmed == "" ||
-			strings.Contains(trimmed, "Psy Shell") ||
-			strings.Contains(trimmed, "exit") {
-			continue
-		}
-		// Remove "= " prefix from results
-		if strings.HasPrefix(trimmed, "= ") {
-			trimmed = strings.TrimPrefix(trimmed, "= ")
-		}
-		result.WriteString(trimmed + "\n")
-	}
-
-	if stderr.Len() > 0 {
-		errOutput := stderr.String()
-		// Filter out common non-error output
-		if !strings.Contains(errOutput, "Xdebug:") {
-			result.WriteString(errOutput)
-		}
-	}
+	output, err := cmd.CombinedOutput()
+	log.Printf("[RunTinker] Command output: %s, err: %v", string(output), err)
 
 	if ctx.Err() == context.DeadlineExceeded {
+		log.Println("[RunTinker] Error: Execution timed out")
 		return "Error: Execution timed out (60s limit)"
+	}
+
+	// Parse and clean output
+	var result strings.Builder
+	lines := strings.Split(string(output), "\n")
+	log.Printf("[RunTinker] Processing %d lines", len(lines))
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		log.Printf("[RunTinker] Line %d: raw=%q trimmed=%q", i, line, trimmed)
+		
+		// Strip leading prompt characters (> or .)
+		cleaned := trimmed
+		for strings.HasPrefix(cleaned, "> ") || strings.HasPrefix(cleaned, ". ") {
+			cleaned = strings.TrimPrefix(cleaned, "> ")
+			cleaned = strings.TrimPrefix(cleaned, ". ")
+			cleaned = strings.TrimSpace(cleaned)
+		}
+		
+		// Skip empty, shell info, and echoed code lines
+		if cleaned == "" || cleaned == "." ||
+			strings.Contains(cleaned, "Psy Shell") ||
+			cleaned == "exit" {
+			log.Printf("[RunTinker] Skipping line")
+			continue
+		}
+		
+		// Check if this is a result line (starts with "= ")
+		if strings.HasPrefix(cleaned, "= ") {
+			val := strings.TrimPrefix(cleaned, "= ")
+			log.Printf("[RunTinker] Found result: %s", val)
+			result.WriteString(val + "\n")
+		} else if !strings.HasPrefix(trimmed, "> ") && !strings.HasPrefix(trimmed, ". ") {
+			// Keep non-prompt output (like dump() output)
+			log.Printf("[RunTinker] Keeping output: %s", cleaned)
+			result.WriteString(cleaned + "\n")
+		}
 	}
 
 	finalResult := strings.TrimSpace(result.String())
 	if finalResult == "" {
+		log.Println("[RunTinker] Result is empty, returning 'null'")
 		return "null"
 	}
+	log.Printf("[RunTinker] Final result: %s", finalResult)
 	return finalResult
 }
 
