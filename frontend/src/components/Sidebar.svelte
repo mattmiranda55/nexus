@@ -1,5 +1,8 @@
 <script>
   import { onMount } from 'svelte';
+  import { Button } from '../lib/components/ui/button';
+  import { Badge } from '../lib/components/ui/badge';
+  import { cn } from '../lib/utils';
   import { projects, currentProject } from '../stores/app.js';
   import { GetProjects, AddProject, RemoveProject, SelectDirectory } from '../../wailsjs/go/main/App.js';
 
@@ -65,99 +68,53 @@
   }
 </script>
 
-<aside class="sidebar">
-  <button class="add-project" on:click={addProject} title="Add Laravel Project">
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 5v14M5 12h14"/>
-    </svg>
-  </button>
-  
-  <div class="projects">
+<aside class="flex h-full w-64 flex-col border-r border-border bg-card/40 p-4">
+  <div class="flex items-center justify-between gap-2">
+    <div>
+      <p class="text-sm font-semibold">Projects</p>
+      <p class="text-xs text-muted-foreground">Right click to remove</p>
+    </div>
+    <Button size="icon" variant="outline" on:click={addProject} title="Add Laravel Project">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14"></path>
+        <path d="M5 12h14"></path>
+      </svg>
+    </Button>
+  </div>
+
+  <div class="mt-4 space-y-2 overflow-y-auto pr-1">
     {#each $projects as project}
-      <button 
-        class="project-btn" 
-        class:active={$currentProject?.id === project.id}
+      <Button
+        variant={$currentProject?.id === project.id ? 'secondary' : 'ghost'}
+        class="group flex w-full items-center justify-between gap-3 rounded-lg border border-transparent px-3 py-2 text-left"
         on:click={() => currentProject.set(project)}
         on:contextmenu|preventDefault={(e) => removeProject(e, project)}
         title={`${project.name}\n${project.path}`}
       >
-        {project.name.charAt(0).toUpperCase()}
-      </button>
+        <div class="flex min-w-0 items-center gap-3">
+          <div
+            class={cn(
+              'flex h-9 w-9 items-center justify-center rounded-md bg-muted text-sm font-semibold text-foreground transition-colors',
+              $currentProject?.id === project.id && 'bg-primary text-primary-foreground'
+            )}
+          >
+            {project.name.charAt(0).toUpperCase()}
+          </div>
+          <div class="min-w-0">
+            <p class="truncate text-sm font-semibold leading-tight">{project.name}</p>
+            <p class="truncate text-xs text-muted-foreground">{project.path}</p>
+          </div>
+        </div>
+        {$currentProject?.id === project.id
+          ? <Badge variant="secondary" class="hidden text-[10px] uppercase tracking-wide text-muted-foreground group-hover:inline-flex">Active</Badge>
+          : null}
+      </Button>
     {/each}
   </div>
 
   {#if $projects.length === 0}
-    <div class="no-projects">
-      <span>Add a Laravel project to get started</span>
+    <div class="mt-6 flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/10 px-4 py-6 text-center">
+      <p class="text-sm font-medium text-muted-foreground">Add a Laravel project to get started</p>
     </div>
   {/if}
 </aside>
-
-<style>
-  .sidebar {
-    width: 48px;
-    background: #1e1e1e;
-    border-right: 1px solid #333;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 8px 0;
-    gap: 8px;
-  }
-
-  .add-project {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    border: 2px dashed #555;
-    background: transparent;
-    color: #888;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-  }
-
-  .add-project:hover {
-    border-color: #f55247;
-    color: #f55247;
-  }
-
-  .projects {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 8px;
-  }
-
-  .project-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    border: none;
-    background: #333;
-    color: #ccc;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .project-btn:hover {
-    background: #444;
-  }
-
-  .project-btn.active {
-    background: #f55247;
-    color: white;
-  }
-
-  .no-projects {
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    color: #555;
-    font-size: 11px;
-    margin-top: 16px;
-    text-align: center;
-  }
-</style>

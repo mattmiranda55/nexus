@@ -5,47 +5,22 @@
   import Editor from './components/Editor.svelte';
   import Output from './components/Output.svelte';
   import Toolbar from './components/Toolbar.svelte';
+  import { cn } from './lib/utils';
   import { layout } from './stores/app.js';
 </script>
 
-<main class="app">
+<main class="flex h-screen w-screen bg-background text-foreground">
   <Sidebar />
-  <div class="main-content">
+  <div class="flex min-w-0 flex-1 flex-col">
     <Toolbar />
-    <div class="editor-output" class:vertical={$layout === 'vertical'}>
+    <div
+      class={cn(
+        'flex min-h-0 flex-1 bg-muted/10',
+        $layout === 'vertical' ? 'flex-col divide-y divide-border' : 'divide-x divide-border'
+      )}
+    >
       <Editor />
       <Output />
     </div>
   </div>
 </main>
-
-<style>
-  .app {
-    display: flex;
-    height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-  }
-
-  .main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .editor-output {
-    flex: 1;
-    display: flex;
-    min-height: 0;
-  }
-
-  .editor-output.vertical {
-    flex-direction: column;
-  }
-
-  .editor-output.vertical :global(.output-container) {
-    border-left: none;
-    border-top: 1px solid #333;
-  }
-</style>

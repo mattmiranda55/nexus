@@ -162,29 +162,31 @@ func (a *App) RunTinker(projectPath, code string) string {
 		return "Error: Invalid Laravel project path"
 	}
 
+	phpPath, err := a.resolvePHPBinary(projectPath)
+	if err != nil {
+		log.Printf("[RunTinker] Error resolving PHP binary: %v", err)
+		return fmt.Sprintf("Error: %s", err)
+	}
+	log.Printf("[RunTinker] Using PHP binary: %s", phpPath)
+
 	// Clean code (remove <?php tag as tinker doesn't need it)
 	cleanCode := strings.TrimPrefix(strings.TrimSpace(code), "<?php")
 	cleanCode = strings.TrimSpace(cleanCode)
 	log.Printf("[RunTinker] Cleaned code: %s", cleanCode)
 
-	// Write code to a temp file for more reliable execution
-	tmpFile, err := os.CreateTemp("", "tinker-*.php")
+	cmd := exec.CommandContext(ctx, phpPath, "artisan", "tinker")
+	cmd.Dir = projectPath
+
+	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		log.Printf("[RunTinker] Error creating temp file: %v", err)
+		log.Printf("[RunTinker] Error opening stdin: %v", err)
 		return fmt.Sprintf("Error: %s", err)
 	}
-	defer os.Remove(tmpFile.Name())
 
-	// Write the code to temp file (no <?php tag - tinker doesn't want it)
-	tmpFile.WriteString(cleanCode + "\n")
-	tmpFile.Close()
-	log.Printf("[RunTinker] Wrote code to temp file: %s", tmpFile.Name())
-
-	// Run tinker with the temp file using shell piping
-	shellCmd := fmt.Sprintf("cat %s | php artisan tinker 2>&1", tmpFile.Name())
-	cmd := exec.CommandContext(ctx, "bash", "-c", shellCmd)
-	cmd.Dir = projectPath
-	log.Printf("[RunTinker] Running command: %s", shellCmd)
+	go func() {
+		defer stdin.Close()
+		io.WriteString(stdin, cleanCode+"\n")
+	}()
 
 	output, err := cmd.CombinedOutput()
 	log.Printf("[RunTinker] Command output: %s, err: %v", string(output), err)
@@ -201,7 +203,7 @@ func (a *App) RunTinker(projectPath, code string) string {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		log.Printf("[RunTinker] Line %d: raw=%q trimmed=%q", i, line, trimmed)
-		
+
 		// Strip leading prompt characters (> or .)
 		cleaned := trimmed
 		for strings.HasPrefix(cleaned, "> ") || strings.HasPrefix(cleaned, ". ") {
@@ -209,7 +211,7 @@ func (a *App) RunTinker(projectPath, code string) string {
 			cleaned = strings.TrimPrefix(cleaned, ". ")
 			cleaned = strings.TrimSpace(cleaned)
 		}
-		
+
 		// Skip empty, shell info, and echoed code lines
 		if cleaned == "" || cleaned == "." ||
 			strings.Contains(cleaned, "Psy Shell") ||
@@ -217,7 +219,7 @@ func (a *App) RunTinker(projectPath, code string) string {
 			log.Printf("[RunTinker] Skipping line")
 			continue
 		}
-		
+
 		// Check if this is a result line (starts with "= ")
 		if strings.HasPrefix(cleaned, "= ") {
 			val := strings.TrimPrefix(cleaned, "= ")
@@ -244,7 +246,13 @@ func (a *App) RunTinkerStreaming(projectPath, code string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "php", "artisan", "tinker")
+	phpPath, err := a.resolvePHPBinary(projectPath)
+	if err != nil {
+		return fmt.Sprintf("Error: %s", err)
+	}
+	log.Printf("[RunTinkerStreaming] Using PHP binary: %s", phpPath)
+
+	cmd := exec.CommandContext(ctx, phpPath, "artisan", "tinker")
 	cmd.Dir = projectPath
 
 	stdin, _ := cmd.StdinPipe()
@@ -273,4 +281,45 @@ func (a *App) RunTinkerStreaming(projectPath, code string) string {
 
 	cmd.Wait()
 	return strings.TrimSpace(result.String())
+}
+
+// resolvePHPBinary tries to locate the PHP executable closest to the project (Herd/local first).
+func (a *App) resolvePHPBinary(projectPath string) (string, error) {
+	var candidates []string
+
+	// Highest priority: explicit override
+	if envPath := strings.TrimSpace(os.Getenv("PULSAR_PHP_PATH")); envPath != "" {
+		candidates = append(candidates, envPath)
+	}
+
+	// Project-local shims (Herd or otherwise)
+	candidates = append(candidates,
+		filepath.Join(projectPath, ".herd", "bin", "php"),
+		filepath.Join(projectPath, "vendor", "bin", "php"),
+		filepath.Join(projectPath, ".config", "herd", "bin", "php"),
+	)
+
+	// User-level Herd installation (macOS/Linux default)
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, filepath.Join(homeDir, ".config", "herd", "bin", "php"))
+	}
+
+	// macOS app bundle path (common Herd install location)
+	candidates = append(candidates, "/Applications/Herd.app/Contents/Resources/bin/php")
+
+	// Fallback to PATH if nothing else is found
+	if pathLookup, err := exec.LookPath("php"); err == nil {
+		candidates = append(candidates, pathLookup)
+	}
+
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("unable to find PHP executable; set PULSAR_PHP_PATH to an explicit binary")
 }

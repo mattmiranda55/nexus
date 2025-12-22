@@ -36,11 +36,4 @@
   });
 </script>
 
-<div class="editor-container" bind:this={editorContainer}></div>
-
-<style>
-  .editor-container {
-    flex: 1;
-    min-height: 0;
-  }
-</style>
+<div class="flex-1 min-h-0 bg-card" bind:this={editorContainer}></div>

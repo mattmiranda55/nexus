@@ -1,51 +1,28 @@
 <script>
+  import { Badge } from '../lib/components/ui/badge';
+  import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle
+  } from '../lib/components/ui/card';
   import { output, isRunning } from '../stores/app.js';
 </script>
 
-<div class="output-container">
-  <div class="output-header">
-    <span>Output</span>
+<Card class="flex min-h-0 flex-1 flex-col rounded-none border-0 bg-card">
+  <CardHeader class="flex flex-row items-center justify-between border-b border-border bg-background/40 py-4">
+    <div>
+      <CardTitle class="text-sm">Output</CardTitle>
+      <CardDescription class="text-xs">Laravel Tinker results</CardDescription>
+    </div>
     {#if $isRunning}
-      <span class="running">Running...</span>
+      <Badge variant="secondary" class="border-primary/30 bg-primary/10 text-xs text-primary">
+        Running...
+      </Badge>
     {/if}
-  </div>
-  <pre class="output-content">{$output || 'Run your code to see output here...'}</pre>
-</div>
-
-<style>
-  .output-container {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    background: #1e1e1e;
-    border-left: 1px solid #333;
-  }
-
-  .output-header {
-    padding: 8px 16px;
-    background: #252526;
-    border-bottom: 1px solid #333;
-    font-size: 12px;
-    color: #888;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .running {
-    color: #0078d4;
-  }
-
-  .output-content {
-    flex: 1;
-    margin: 0;
-    padding: 16px;
-    overflow: auto;
-    font-family: "Reddit Mono Variable", monospace;
-    font-size: 13px;
-    color: #d4d4d4;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-  }
-</style>
+  </CardHeader>
+  <CardContent class="flex-1 overflow-auto bg-card px-4 py-4 font-mono text-sm leading-6 text-foreground/90">
+    <pre class="m-0 whitespace-pre-wrap break-words">{$output || 'Run your code to see output here...'}</pre>
+  </CardContent>
+</Card>
