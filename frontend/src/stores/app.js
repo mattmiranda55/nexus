@@ -11,6 +11,11 @@ dump($users->count());
 export const output = writable('');
 export const isRunning = writable(false);
 export const layout = writable('horizontal'); // 'horizontal' or 'vertical'
+export const outputTab = writable('tinker'); // 'tinker' or 'logs'
 
 // Snippets for quick access
 export const snippets = writable([]);
+
+// Log viewer state
+export const logs = writable('');
+export const logStatus = writable('idle'); // 'idle' | 'loading' | 'tailing' | 'error'

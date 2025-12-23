@@ -26,6 +26,14 @@ export function RunTinkerStreaming(arg1, arg2) {
   return window['go']['main']['App']['RunTinkerStreaming'](arg1, arg2);
 }
 
+export function StartLogTail(arg1) {
+  return window['go']['main']['App']['StartLogTail'](arg1);
+}
+
+export function StopLogTail() {
+  return window['go']['main']['App']['StopLogTail']();
+}
+
 export function SelectDirectory() {
   return window['go']['main']['App']['SelectDirectory']();
 }

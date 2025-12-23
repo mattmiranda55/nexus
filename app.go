@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -24,6 +25,8 @@ type App struct {
 	projects []Project
 	settings Settings
 	mu       sync.RWMutex
+	logMu    sync.Mutex
+	logStop  context.CancelFunc
 }
 
 // Project represents a Laravel project
@@ -224,6 +227,125 @@ func (a *App) RemoveProject(id string) {
 	}
 	a.saveProjects()
 	log.Printf("[RemoveProject] Project removed, %d projects remaining", len(a.projects))
+}
+
+// StartLogTail begins tailing the Laravel log file for the given project path.
+// It streams new lines to the frontend via Wails events.
+func (a *App) StartLogTail(projectPath string) (string, error) {
+	log.Printf("[StartLogTail] Starting log tail for project: %s", projectPath)
+
+	if projectPath == "" {
+		return "", fmt.Errorf("project path is required")
+	}
+
+	logFilePath := filepath.Join(projectPath, "storage", "logs", "laravel.log")
+	if err := os.MkdirAll(filepath.Dir(logFilePath), 0755); err != nil {
+		return "", fmt.Errorf("unable to prepare log directory: %w", err)
+	}
+
+	// Stop any existing tail
+	a.logMu.Lock()
+	if a.logStop != nil {
+		log.Println("[StartLogTail] Stopping existing log tail")
+		a.logStop()
+		a.logStop = nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	a.logStop = cancel
+	a.logMu.Unlock()
+
+	initial, err := a.readLogTail(logFilePath, 200)
+	if err != nil {
+		log.Printf("[StartLogTail] Error reading existing logs: %v", err)
+		a.StopLogTail()
+		return "", fmt.Errorf("unable to read log file: %w", err)
+	}
+
+	go a.streamLogFile(ctx, logFilePath)
+
+	return initial, nil
+}
+
+// StopLogTail stops the active log tailing session.
+func (a *App) StopLogTail() {
+	a.logMu.Lock()
+	defer a.logMu.Unlock()
+
+	if a.logStop != nil {
+		log.Println("[StopLogTail] Stopping log tail")
+		a.logStop()
+		a.logStop = nil
+	}
+}
+
+// readLogTail returns the last maxLines from the log file to seed the viewer.
+func (a *App) readLogTail(path string, maxLines int) (string, error) {
+	file, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+		if len(lines) > maxLines {
+			lines = lines[1:]
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+
+	return strings.Join(lines, "\n"), nil
+}
+
+// streamLogFile follows the log file similar to `tail -f` and emits updates.
+func (a *App) streamLogFile(ctx context.Context, path string) {
+	log.Printf("[LogTail] Streaming log file: %s", path)
+
+	file, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0644)
+	if err != nil {
+		log.Printf("[LogTail] Error opening log file: %v", err)
+		runtime.EventsEmit(a.ctx, "log:error", fmt.Sprintf("Unable to open log file: %v", err))
+		return
+	}
+	defer file.Close()
+
+	if _, err := file.Seek(0, io.SeekEnd); err != nil {
+		log.Printf("[LogTail] Error seeking to end: %v", err)
+		runtime.EventsEmit(a.ctx, "log:error", fmt.Sprintf("Unable to read log file: %v", err))
+		return
+	}
+
+	reader := bufio.NewReader(file)
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("[LogTail] Log tail cancelled")
+			return
+		default:
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					time.Sleep(300 * time.Millisecond)
+					continue
+				}
+
+				log.Printf("[LogTail] Error reading log file: %v", err)
+				runtime.EventsEmit(a.ctx, "log:error", fmt.Sprintf("Error reading log file: %v", err))
+				return
+			}
+
+			cleaned := strings.TrimRight(line, "\r\n")
+			runtime.EventsEmit(a.ctx, "log:update", cleaned)
+		}
+	}
 }
 
 // RunTinker executes code through php artisan tinker

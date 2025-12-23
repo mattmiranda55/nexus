@@ -14,6 +14,10 @@ export function RunTinker(arg1:string,arg2:string):Promise<string>;
 
 export function RunTinkerStreaming(arg1:string,arg2:string):Promise<string>;
 
+export function StartLogTail(arg1:string):Promise<string>;
+
+export function StopLogTail():Promise<void>;
+
 export function SelectDirectory():Promise<string>;
 
 export function UpdateSettings(arg1:main.Settings):Promise<void>;
