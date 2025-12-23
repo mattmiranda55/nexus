@@ -1,4 +1,5 @@
 <script>
+  import { createEventDispatcher } from 'svelte';
   import { cva } from 'class-variance-authority';
   import { cn } from '../../../utils';
 
@@ -8,6 +9,19 @@
   export let type = 'button';
   export let href = undefined;
   export let disabled = false;
+
+  const dispatch = createEventDispatcher();
+
+  function handleClick(event) {
+    dispatch('click', event);
+  }
+
+  function handleContextmenu(event) {
+    const shouldContinue = dispatch('contextmenu', event);
+    if (!shouldContinue) {
+      event.preventDefault();
+    }
+  }
 
   const buttonVariants = cva(
     'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ring-offset-background',
@@ -41,6 +55,8 @@
   disabled={disabled}
   href={href}
   class={cn(buttonVariants({ variant, size }), className, $$props.class)}
+  on:click={handleClick}
+  on:contextmenu={handleContextmenu}
   {...$$restProps}
 >
   <slot />

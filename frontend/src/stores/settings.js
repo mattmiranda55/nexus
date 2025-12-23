@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { GetSettings, UpdateSettings } from '../wailsjs/go/main/App.js';
+import { GetSettings, UpdateSettings } from '../../wailsjs/go/main/App.js';
 
 const defaultSettings = { theme: 'dark', phpPath: '' };
 
@@ -9,7 +9,7 @@ function createSettingsStore() {
   function applyTheme(theme) {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
-    root.classList.toggle('light', theme === 'light');
+    root.classList.toggle('dark', theme === 'dark');
   }
 
   async function load() {

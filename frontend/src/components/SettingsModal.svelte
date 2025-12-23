@@ -30,7 +30,14 @@
 </script>
 
 {#if open}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" on:click|self={close}>
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+    tabindex="0"
+    on:click|self={close}
+    on:keydown={(event) => {
+      if (event.key === 'Escape') close();
+    }}
+  >
     <Card class="w-full max-w-xl border-border bg-background shadow-lg">
       <CardHeader class="flex flex-row items-start justify-between gap-4 border-b border-border">
         <div>
@@ -46,8 +53,8 @@
       </CardHeader>
       <CardContent class="space-y-6">
         <form class="space-y-6" on:submit={handleSubmit}>
-          <div class="space-y-2">
-            <label class="block text-sm font-medium">Theme</label>
+          <fieldset class="space-y-2">
+            <legend class="block text-sm font-medium">Theme</legend>
             <div class="flex flex-wrap gap-2">
               {#each themes as theme}
                 <Button
@@ -60,12 +67,13 @@
                 </Button>
               {/each}
             </div>
-          </div>
+          </fieldset>
 
           <div class="space-y-2">
-            <label class="block text-sm font-medium">PHP binary override</label>
+            <label for="php-path" class="block text-sm font-medium">PHP binary override</label>
             <p class="text-xs text-muted-foreground">Use this to point Pulsar to a specific php executable (e.g. Herd managed).</p>
             <input
+              id="php-path"
               class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               placeholder="/path/to/php or C:\\path\\to\\php.exe"
               bind:value={form.phpPath}

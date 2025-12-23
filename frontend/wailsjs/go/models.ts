@@ -16,7 +16,6 @@ export namespace main {
 	        this.path = source["path"];
 	    }
 	}
-
 	export class Settings {
 	    theme: string;
 	    phpPath: string;
@@ -33,3 +32,4 @@ export namespace main {
 	}
 
 }
+

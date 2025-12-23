@@ -49,8 +49,7 @@
     }
   }
 
-  async function removeProject(e, project) {
-    e.stopPropagation();
+  async function removeProject(project) {
     console.log('[Sidebar] removeProject called for:', project);
     if (confirm(`Remove "${project.name}" from projects?`)) {
       try {
@@ -88,7 +87,10 @@
         variant={$currentProject?.id === project.id ? 'secondary' : 'ghost'}
         class="group flex w-full items-center justify-between gap-3 rounded-lg border border-transparent px-3 py-2 text-left"
         on:click={() => currentProject.set(project)}
-        on:contextmenu|preventDefault={(e) => removeProject(e, project)}
+        on:contextmenu={(e) => {
+          e.preventDefault();
+          removeProject(project);
+        }}
         title={`${project.name}\n${project.path}`}
       >
         <div class="flex min-w-0 items-center gap-3">
@@ -105,9 +107,14 @@
             <p class="truncate text-xs text-muted-foreground">{project.path}</p>
           </div>
         </div>
-        {$currentProject?.id === project.id
-          ? <Badge variant="secondary" class="hidden text-[10px] uppercase tracking-wide text-muted-foreground group-hover:inline-flex">Active</Badge>
-          : null}
+        {#if $currentProject?.id === project.id}
+          <Badge
+            variant="secondary"
+            class="hidden text-[10px] uppercase tracking-wide text-muted-foreground group-hover:inline-flex"
+          >
+            Active
+          </Badge>
+        {/if}
       </Button>
     {/each}
   </div>
