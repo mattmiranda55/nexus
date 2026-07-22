@@ -10,6 +10,8 @@ const emit = defineEmits(['close']);
 const form = useForm({
     theme: props.settings.theme ?? 'dark',
     phpPath: props.settings.phpPath ?? '',
+    editor: props.settings.editor ?? 'phpstorm',
+    notifyErrors: props.settings.notifyErrors ?? true,
 });
 
 function save() {
@@ -47,6 +49,26 @@ function save() {
                         class="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 font-mono text-xs dark:border-neutral-700"
                     />
                 </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-neutral-500">Editor (click-to-source)</label>
+                    <select
+                        v-model="form.editor"
+                        class="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-neutral-700"
+                    >
+                        <option value="phpstorm">PhpStorm</option>
+                        <option value="vscode">VS Code</option>
+                        <option value="vscodium">VSCodium</option>
+                        <option value="cursor">Cursor</option>
+                        <option value="sublime">Sublime Text</option>
+                        <option value="textmate">TextMate</option>
+                    </select>
+                </div>
+
+                <label class="flex items-center gap-2 text-sm">
+                    <input v-model="form.notifyErrors" type="checkbox" class="rounded border-neutral-300 dark:border-neutral-700" />
+                    <span>Desktop notification on log errors</span>
+                </label>
             </div>
 
             <div class="mt-6 flex justify-end gap-2">

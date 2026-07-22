@@ -5,13 +5,14 @@ export function parseLogLine(line) {
     const trimmed = line.trim();
 
     // e.g. "[2026-07-19 12:00:00] local.ERROR: Something broke"
-    const laravelMatch = trimmed.match(/^\[([^\]]+)\]\s+(?:[\w-]+\.)?([A-Z]+):\s*(.*)$/);
+    const laravelMatch = trimmed.match(/^\[([^\]]+)\]\s+(?:([\w-]+)\.)?([A-Z]+):\s*(.*)$/);
     if (laravelMatch) {
         return {
             isNew: true,
             timestamp: laravelMatch[1],
-            level: laravelMatch[2],
-            message: laravelMatch[3] || '',
+            env: laravelMatch[2] || '',
+            level: laravelMatch[3],
+            message: laravelMatch[4] || '',
         };
     }
 
@@ -21,6 +22,7 @@ export function parseLogLine(line) {
         return {
             isNew: true,
             timestamp: fallbackMatch[1],
+            env: '',
             level: fallbackMatch[2],
             message: fallbackMatch[3] || '',
         };
@@ -28,6 +30,14 @@ export function parseLogLine(line) {
 
     // Continuation line (stack trace, context, etc.)
     return { isNew: false, message: trimmed };
+}
+
+// Pulls an absolute source location out of a line — both PHP stack-frame shapes:
+//   "#0 /app/Foo.php(123): Bar->baz()"  and  "... in /app/Foo.php:123"
+export function parseFrame(text) {
+    const match = (text || '').match(/(\/[^\s:()]+\.php)[:(](\d+)\)?/);
+    if (!match) return null;
+    return { file: match[1], line: Number(match[2]) };
 }
 
 export function buildParsedLogs(content) {
@@ -46,22 +56,31 @@ export function buildParsedLogs(content) {
             if (current) entries.push(current);
             current = {
                 timestamp: parsed.timestamp,
+                env: parsed.env ?? '',
                 level: parsed.level.toLowerCase(),
                 originalLevel: parsed.level,
                 message: parsed.message,
                 details: [],
+                stack: [],
                 raw: rawLine,
             };
+            // A location can sit on the header line itself ("… in /f.php:12").
+            const headFrame = parseFrame(parsed.message);
+            if (headFrame) current.stack.push({ ...headFrame, raw: parsed.message });
         } else if (current) {
             current.details.push(rawLine);
+            const frame = parseFrame(rawLine);
+            if (frame) current.stack.push({ ...frame, raw: rawLine.trim() });
         } else {
             // Orphan continuation before any header — treat as a plain info line.
             current = {
                 timestamp: '',
+                env: '',
                 level: 'info',
                 originalLevel: 'INFO',
                 message: rawLine,
                 details: [],
+                stack: [],
                 raw: rawLine,
             };
         }

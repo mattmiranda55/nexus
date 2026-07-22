@@ -41,6 +41,14 @@ defineEmits(['run', 'update:activeTab', 'update:layout']);
             >
                 Logs
             </button>
+            <button
+                type="button"
+                class="rounded px-3 py-1"
+                :class="activeTab === 'workbench' ? 'bg-white shadow-sm dark:bg-neutral-700' : 'text-neutral-500'"
+                @click="$emit('update:activeTab', 'workbench')"
+            >
+                Workbench
+            </button>
         </div>
 
         <button

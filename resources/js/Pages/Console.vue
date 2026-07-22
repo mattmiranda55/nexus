@@ -12,6 +12,7 @@ import { postJson } from '../lib/http.js';
 // the log viewer don't block the app shell's first paint.
 const Editor = defineAsyncComponent(() => import('../Components/Editor.vue'));
 const LogViewer = defineAsyncComponent(() => import('../Components/LogViewer.vue'));
+const Workbench = defineAsyncComponent(() => import('../Components/Workbench/Workbench.vue'));
 
 const props = defineProps({
     projects: { type: Array, default: () => [] },
@@ -23,9 +24,31 @@ const page = usePage();
 const settingsOpen = ref(false);
 const activeTab = ref('tinker');
 const layout = ref('vertical'); // vertical (stacked) | horizontal (side-by-side)
-const code = ref("// Explore your app — Cmd/Ctrl+Enter to run\nUser::count();");
-const output = ref('');
 const running = ref(false);
+
+const DEFAULT_CODE = "// Explore your app — Cmd/Ctrl+Enter to run\nUser::count();";
+
+// Tinker context is per-project (like the log stream): each project keeps its
+// own scratch buffer and last result, so switching projects visibly swaps what
+// you're looking at instead of leaving the previous project's code/output up.
+const buffers = ref({}); // projectId -> editor contents
+const outputs = ref({}); // projectId -> { envelope, raw }
+
+// Keys the buffer maps; falls back to a shared slot when no project is active.
+function bufferKey(id) {
+    return id ?? '_none';
+}
+
+const code = computed({
+    get: () => buffers.value[bufferKey(props.activeProjectId)] ?? DEFAULT_CODE,
+    set: (value) => {
+        buffers.value[bufferKey(props.activeProjectId)] = value;
+    },
+});
+
+const output = computed(
+    () => outputs.value[bufferKey(props.activeProjectId)] ?? { envelope: null, raw: '' },
+);
 
 const activeProject = computed(
     () => props.projects.find((p) => p.id === props.activeProjectId) ?? null,
@@ -42,16 +65,31 @@ watch(() => props.settings.theme, applyTheme);
 
 const flashError = computed(() => page.props.flash?.error);
 
+// Workbench panels can hand a starter query to the editor: load it into the
+// active project's buffer, switch to the Tinker tab, and run it.
+function runCode(newCode) {
+    if (!activeProject.value) return;
+    code.value = newCode;
+    activeTab.value = 'tinker';
+    runTinker();
+}
+
 async function runTinker() {
     if (running.value || !activeProject.value) return;
 
+    // Pin the target project so a mid-run project switch writes the result to
+    // the project it actually ran against, not whatever is active on return.
+    const key = bufferKey(props.activeProjectId);
     running.value = true;
     activeTab.value = 'tinker';
     try {
         const { data } = await postJson('/tinker', { code: code.value });
-        output.value = data?.output ?? '(no output)';
+        outputs.value[key] = {
+            envelope: data?.envelope ?? null,
+            raw: data?.raw ?? data?.output ?? '(no output)',
+        };
     } catch (e) {
-        output.value = 'Error: ' + e.message;
+        outputs.value[key] = { envelope: null, raw: 'Error: ' + e.message };
     } finally {
         running.value = false;
     }
@@ -93,12 +131,14 @@ async function runTinker() {
                             class="min-h-0 min-w-0"
                             :class="layout === 'vertical' ? 'h-2/5' : 'w-2/5'"
                         >
-                            <Output :output="output" :running="running" />
+                            <Output :result="output" :running="running" />
                         </div>
                     </div>
                 </template>
 
-                <LogViewer v-else :active-project="activeProject" />
+                <LogViewer v-else-if="activeTab === 'logs'" :active-project="activeProject" :settings="settings" />
+
+                <Workbench v-else :active-project="activeProject" @run-code="runCode" />
             </div>
 
             <StatusBar :active-project="activeProject" :running="running" :theme="settings.theme" />

@@ -41,6 +41,20 @@ class TinkerTest extends TestCase
             ->assertJson(['output' => '5']);
     }
 
+    public function test_tinker_endpoint_returns_structured_envelope(): void
+    {
+        $project = Project::create(['name' => 'self', 'path' => base_path()]);
+        Setting::current()->update(['active_project_id' => $project->id]);
+
+        $response = $this->post('/tinker', ['code' => "['id' => 1, 'name' => 'Ada'];"])
+            ->assertOk();
+
+        $envelope = $response->json('envelope');
+        $this->assertNotNull($envelope, 'Expected a structured envelope from the real tinker run');
+        $this->assertSame('assoc', $envelope['root']['kind']);
+        $this->assertSame('name', $envelope['root']['entries'][1]['key']);
+    }
+
     public function test_tinker_endpoint_requires_an_active_project(): void
     {
         $this->post('/tinker', ['code' => '2+3;'])

@@ -18,6 +18,8 @@ class ConsoleController extends Controller
             'settings' => [
                 'theme' => $settings->theme,
                 'phpPath' => $settings->php_path,
+                'editor' => $settings->editor,
+                'notifyErrors' => (bool) $settings->notify_errors,
             ],
             'activeProjectId' => $settings->active_project_id,
         ]);

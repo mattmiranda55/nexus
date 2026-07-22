@@ -1,12 +1,34 @@
 import { expect, test } from 'bun:test';
-import { parseLogLine, buildParsedLogs, levelStyle } from './logParser.js';
+import { parseLogLine, parseFrame, buildParsedLogs, levelStyle } from './logParser.js';
 
 test('parses a standard Laravel log header line', () => {
     const p = parseLogLine('[2026-07-19 12:00:00] local.ERROR: Boom');
     expect(p.isNew).toBe(true);
     expect(p.timestamp).toBe('2026-07-19 12:00:00');
+    expect(p.env).toBe('local');
     expect(p.level).toBe('ERROR');
     expect(p.message).toBe('Boom');
+});
+
+test('parses source locations from both frame shapes', () => {
+    expect(parseFrame('#0 /app/Foo.php(123): Bar->baz()')).toEqual({ file: '/app/Foo.php', line: 123 });
+    expect(parseFrame('Uncaught error in /app/Http/Kernel.php:88')).toEqual({ file: '/app/Http/Kernel.php', line: 88 });
+    expect(parseFrame('no path here')).toBeNull();
+});
+
+test('collects stack frames from continuation lines', () => {
+    const content = [
+        '[2026-07-19 12:00:00] local.ERROR: Boom',
+        'Stack trace:',
+        '#0 /app/foo.php(12): bar()',
+        '#1 /app/baz.php(34): qux()',
+    ].join('\n');
+
+    const [entry] = buildParsedLogs(content);
+    expect(entry.stack).toEqual([
+        { file: '/app/foo.php', line: 12, raw: '#0 /app/foo.php(12): bar()' },
+        { file: '/app/baz.php', line: 34, raw: '#1 /app/baz.php(34): qux()' },
+    ]);
 });
 
 test('treats a non-header line as a continuation', () => {

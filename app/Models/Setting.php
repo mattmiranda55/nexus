@@ -6,7 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class Setting extends Model
 {
-    protected $fillable = ['theme', 'php_path', 'active_project_id'];
+    protected $fillable = ['theme', 'php_path', 'active_project_id', 'editor', 'notify_errors'];
+
+    protected $casts = ['notify_errors' => 'boolean'];
 
     /**
      * The app keeps a single settings row. Fetch it (creating defaults once).

@@ -20,11 +20,16 @@ class TinkerController extends Controller
         $project = $activeId ? Project::find($activeId) : null;
 
         if (! $project) {
-            return response()->json(['output' => 'Error: No project selected'], 422);
+            return response()->json(['output' => 'Error: No project selected', 'envelope' => null], 422);
         }
 
+        $result = $runner->runStructured($project->path, $data['code']);
+
         return response()->json([
-            'output' => $runner->run($project->path, $data['code']),
+            'envelope' => $result['envelope'],
+            'raw' => $result['raw'],
+            // Back-compat alias: the raw/CLI-parity view is the old `output`.
+            'output' => $result['raw'],
         ]);
     }
 }
