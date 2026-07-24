@@ -30,6 +30,24 @@ php artisan test                       # backend (PHPUnit)
 bun test resources/js/lib              # frontend log parser
 ```
 
+## Beyond the port (the Hub update)
+
+On top of the roadmap features (structured output, deep logs, workbench, mail):
+
+- **⌘K command palette** — fuzzy switchboard over everything: tabs, workbench
+  panels, project switching, snippets, recent runs, theme/layout/settings.
+  `resources/js/Components/CommandPalette.vue` + `resources/js/lib/fuzzy.js`.
+- **Database browser** — Workbench → Database. Table list (`db:show --json`),
+  schema (`db:table --json`), and read-only row browsing that runs
+  `DB::table(...)` through the same structured tinker pipeline as the REPL.
+- **Snippet library** — save the editor buffer as a named per-project or global
+  snippet (toolbar bookmark icon), insert from the palette. Same name overwrites.
+- **Run history** — every tinker run is recorded (code, ok, duration), kept to
+  the last 100 per project. Toolbar clock icon or the palette restores old code
+  into the editor; nothing re-runs without an explicit ⌘↵.
+
+After pulling: `php artisan migrate` (adds `snippets` + `runs`).
+
 ## How it maps to the original Go app
 
 The old app exposed ~10 bound Go methods; here's where that logic now lives.

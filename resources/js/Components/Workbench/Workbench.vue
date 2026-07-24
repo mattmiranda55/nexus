@@ -1,10 +1,11 @@
 <script setup>
 // The Laravel workbench: introspection panels scoped to the active project.
 // Each sub-panel fetches on demand and renders through the shared table view.
-import { ref } from 'vue';
+// The active panel is a model so the command palette can deep-link into one.
 import RoutesPanel from './RoutesPanel.vue';
 import ModelsPanel from './ModelsPanel.vue';
 import MigrationsPanel from './MigrationsPanel.vue';
+import DatabasePanel from './DatabasePanel.vue';
 
 const props = defineProps({
     activeProject: { type: Object, default: null },
@@ -12,9 +13,10 @@ const props = defineProps({
 
 const emit = defineEmits(['run-code']);
 
-const panel = ref('models');
+const panel = defineModel('panel', { type: String, default: 'models' });
 const PANELS = [
     { key: 'models', label: 'Models' },
+    { key: 'database', label: 'Database' },
     { key: 'routes', label: 'Routes' },
     { key: 'migrations', label: 'Migrations' },
 ];
@@ -41,6 +43,7 @@ const PANELS = [
 
         <div v-else class="min-h-0 flex-1">
             <ModelsPanel v-if="panel === 'models'" :active-project="activeProject" @run-code="emit('run-code', $event)" />
+            <DatabasePanel v-else-if="panel === 'database'" :active-project="activeProject" @run-code="emit('run-code', $event)" />
             <RoutesPanel v-else-if="panel === 'routes'" :active-project="activeProject" />
             <MigrationsPanel v-else :active-project="activeProject" />
         </div>

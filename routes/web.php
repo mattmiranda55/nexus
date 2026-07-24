@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\ConsoleController;
 use App\Http\Controllers\EditorController;
+use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\MailController;
 use App\Http\Controllers\NotifyController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SnippetController;
 use App\Http\Controllers\TinkerController;
 use App\Http\Controllers\WorkbenchController;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +33,9 @@ Route::post('/workbench/routes', [WorkbenchController::class, 'routes'])->name('
 Route::post('/workbench/models', [WorkbenchController::class, 'models'])->name('workbench.models');
 Route::post('/workbench/model', [WorkbenchController::class, 'model'])->name('workbench.model');
 Route::post('/workbench/migrations', [WorkbenchController::class, 'migrations'])->name('workbench.migrations');
+Route::post('/workbench/db/tables', [WorkbenchController::class, 'dbTables'])->name('workbench.db.tables');
+Route::post('/workbench/db/table', [WorkbenchController::class, 'dbTable'])->name('workbench.db.table');
+Route::post('/workbench/db/rows', [WorkbenchController::class, 'dbRows'])->name('workbench.db.rows');
 Route::post('/workbench/migrate', [WorkbenchController::class, 'migrate'])->name('workbench.migrate');
 Route::post('/workbench/rollback', [WorkbenchController::class, 'rollback'])->name('workbench.rollback');
 
@@ -42,3 +47,10 @@ Route::get('/mail/messages', [MailController::class, 'messages'])->name('mail.me
 Route::get('/mail/message/{id}', [MailController::class, 'message'])->name('mail.message');
 Route::get('/mail/message/{id}/raw', [MailController::class, 'raw'])->name('mail.raw');
 Route::delete('/mail/messages', [MailController::class, 'destroy'])->name('mail.destroy');
+
+Route::get('/snippets', [SnippetController::class, 'index'])->name('snippets.index');
+Route::post('/snippets', [SnippetController::class, 'store'])->name('snippets.store');
+Route::delete('/snippets/{snippet}', [SnippetController::class, 'destroy'])->name('snippets.destroy');
+
+Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
+Route::delete('/history', [HistoryController::class, 'destroy'])->name('history.destroy');

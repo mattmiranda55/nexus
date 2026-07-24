@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\Setting;
 use App\Services\ArtisanRunner;
 use App\Services\MigrateStatusParser;
+use App\Services\TinkerRunner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -82,6 +83,71 @@ class WorkbenchController extends Controller
                 'pending' => collect($rows)->where('ran', false)->count(),
             ]);
         });
+    }
+
+    /** C7 — database overview: db:show --json (connection + table list). */
+    public function dbTables(): JsonResponse
+    {
+        return $this->withProject(function (Project $project) {
+            $result = $this->artisan->run($project->path, ['db:show', '--json', '--counts']);
+
+            if (! $result['ok']) {
+                return response()->json(['error' => $result['error']], 422);
+            }
+
+            return response()->json(['database' => $result['json']]);
+        });
+    }
+
+    /** C7 — one table's schema: db:table {name} --json (columns + indexes). */
+    public function dbTable(Request $request): JsonResponse
+    {
+        $name = $this->tableName($request);
+
+        return $this->withProject(function (Project $project) use ($name) {
+            $result = $this->artisan->run($project->path, ['db:table', $name, '--json']);
+
+            if (! $result['ok']) {
+                return response()->json(['error' => $result['error']], 422);
+            }
+
+            return response()->json(['table' => $result['json']]);
+        });
+    }
+
+    /**
+     * C7 — browse a table's rows. The query is generated here (never from free
+     * text) and runs through the same structured tinker pipeline as the REPL,
+     * so the response is a Tier B envelope the table view already renders.
+     */
+    public function dbRows(Request $request, TinkerRunner $tinker): JsonResponse
+    {
+        $name = $this->tableName($request);
+        $offset = max(0, (int) $request->input('offset', 0));
+
+        return $this->withProject(function (Project $project) use ($tinker, $name, $offset) {
+            $code = sprintf(
+                "DB::table('%s')->offset(%d)->limit(50)->get();",
+                $name,
+                $offset,
+            );
+
+            $result = $tinker->runStructured($project->path, $code);
+
+            if ($result['envelope'] === null) {
+                return response()->json(['error' => trim($result['raw']) ?: 'Query failed'], 422);
+            }
+
+            return response()->json(['envelope' => $result['envelope'], 'offset' => $offset]);
+        });
+    }
+
+    /** Table names are identifiers, never SQL: strip everything else. */
+    private function tableName(Request $request): string
+    {
+        $data = $request->validate(['table' => 'required|string|max:128']);
+
+        return preg_replace('/[^A-Za-z0-9_]/', '', $data['table']);
     }
 
     /** C5 — run pending migrations (destructive; frontend confirms first). */

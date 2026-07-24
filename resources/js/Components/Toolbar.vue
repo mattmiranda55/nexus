@@ -6,7 +6,7 @@ defineProps({
     layout: { type: String, default: 'vertical' },
 });
 
-defineEmits(['run', 'update:activeTab', 'update:layout']);
+defineEmits(['run', 'update:activeTab', 'update:layout', 'save-snippet', 'history', 'palette']);
 </script>
 
 <template>
@@ -63,6 +63,32 @@ defineEmits(['run', 'update:activeTab', 'update:layout']);
             v-if="activeTab === 'tinker'"
             type="button"
             class="ml-auto rounded p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+            :disabled="!hasProject"
+            title="Save buffer as snippet"
+            @click="$emit('save-snippet')"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                <path fill-rule="evenodd" d="M10 2c-1.716 0-3.408.106-5.07.31C3.806 2.45 3 3.414 3 4.517V17.25a.75.75 0 0 0 1.075.676L10 15.082l5.925 2.844A.75.75 0 0 0 17 17.25V4.517c0-1.103-.806-2.068-1.93-2.207A41.403 41.403 0 0 0 10 2Z" clip-rule="evenodd" />
+            </svg>
+        </button>
+
+        <button
+            v-if="activeTab === 'tinker'"
+            type="button"
+            class="rounded p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+            :disabled="!hasProject"
+            title="Run history"
+            @click="$emit('history')"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
+            </svg>
+        </button>
+
+        <button
+            v-if="activeTab === 'tinker'"
+            type="button"
+            class="rounded p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
             :title="layout === 'vertical' ? 'Switch to side-by-side' : 'Switch to stacked'"
             @click="$emit('update:layout', layout === 'vertical' ? 'horizontal' : 'vertical')"
         >
@@ -74,6 +100,13 @@ defineEmits(['run', 'update:activeTab', 'update:layout']);
             </svg>
         </button>
 
-        <span class="text-xs text-neutral-400" :class="activeTab === 'tinker' ? '' : 'ml-auto'">⌘↵ to run</span>
+        <button
+            type="button"
+            class="rounded px-1.5 py-0.5 text-xs text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            :class="activeTab === 'tinker' ? '' : 'ml-auto'"
+            title="Command palette"
+            @click="$emit('palette')"
+        >⌘K</button>
+        <span class="text-xs text-neutral-400">⌘↵ to run</span>
     </div>
 </template>

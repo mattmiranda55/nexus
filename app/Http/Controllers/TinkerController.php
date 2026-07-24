@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\Run;
 use App\Models\Setting;
 use App\Services\LogDeltaReader;
 use App\Services\TinkerRunner;
@@ -29,7 +30,18 @@ class TinkerController extends Controller
         $logPath = $project->logPath();
         $before = $logs->size($logPath);
 
+        $started = hrtime(true);
         $result = $runner->runStructured($project->path, $data['code']);
+
+        // Run history: an envelope means the code executed to completion and
+        // produced a structured result; its absence means tinker bailed early
+        // (parse error, exception, missing binary).
+        Run::record(
+            $project->id,
+            $data['code'],
+            $result['envelope'] !== null,
+            (int) ((hrtime(true) - $started) / 1_000_000),
+        );
 
         return response()->json([
             'envelope' => $result['envelope'],

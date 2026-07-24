@@ -45,6 +45,44 @@ class WorkbenchTest extends TestCase
         $this->assertTrue($uris->contains('tinker'), 'Expected the tinker route in route:list output');
     }
 
+    public function test_db_endpoints_require_an_active_project(): void
+    {
+        $this->post('/workbench/db/tables')->assertStatus(422)->assertJson(['error' => 'No project selected']);
+        $this->postJson('/workbench/db/table', ['table' => 'migrations'])->assertStatus(422);
+        $this->postJson('/workbench/db/rows', ['table' => 'migrations'])->assertStatus(422);
+    }
+
+    public function test_db_table_and_rows_require_a_table_name(): void
+    {
+        $this->activateSelf();
+
+        $this->postJson('/workbench/db/table', [])->assertStatus(422);
+        $this->postJson('/workbench/db/rows', [])->assertStatus(422);
+    }
+
+    public function test_db_show_lists_this_apps_tables(): void
+    {
+        $this->activateSelf();
+
+        $database = $this->post('/workbench/db/tables')->assertOk()->json('database');
+
+        $names = collect($database['tables'] ?? [])
+            ->map(fn ($t) => $t['table'] ?? $t['name'] ?? null);
+        $this->assertTrue($names->contains('migrations'), 'Expected the migrations table in db:show output');
+    }
+
+    public function test_db_rows_returns_a_structured_envelope(): void
+    {
+        $this->activateSelf();
+
+        $response = $this->postJson('/workbench/db/rows', ['table' => 'migrations'])->assertOk();
+
+        $envelope = $response->json('envelope');
+        $this->assertIsArray($envelope);
+        $this->assertArrayHasKey('table', $envelope);
+        $this->assertContains('migration', $envelope['table']['columns'] ?? []);
+    }
+
     public function test_migration_status_lists_migrations(): void
     {
         $this->activateSelf();
