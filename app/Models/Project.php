@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Project extends Model
 {
-    protected $fillable = ['name', 'path'];
+    protected $fillable = ['name', 'path', 'mail_url'];
 
     /**
      * The conventional path to this project's Laravel log file.

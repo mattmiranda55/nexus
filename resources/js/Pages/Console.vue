@@ -13,6 +13,7 @@ import { postJson } from '../lib/http.js';
 const Editor = defineAsyncComponent(() => import('../Components/Editor.vue'));
 const LogViewer = defineAsyncComponent(() => import('../Components/LogViewer.vue'));
 const Workbench = defineAsyncComponent(() => import('../Components/Workbench/Workbench.vue'));
+const MailInbox = defineAsyncComponent(() => import('../Components/MailInbox.vue'));
 
 const props = defineProps({
     projects: { type: Array, default: () => [] },
@@ -47,7 +48,7 @@ const code = computed({
 });
 
 const output = computed(
-    () => outputs.value[bufferKey(props.activeProjectId)] ?? { envelope: null, raw: '' },
+    () => outputs.value[bufferKey(props.activeProjectId)] ?? { envelope: null, raw: '', logged: null },
 );
 
 const activeProject = computed(
@@ -87,9 +88,10 @@ async function runTinker() {
         outputs.value[key] = {
             envelope: data?.envelope ?? null,
             raw: data?.raw ?? data?.output ?? '(no output)',
+            logged: data?.loggedDuringRun ?? null,
         };
     } catch (e) {
-        outputs.value[key] = { envelope: null, raw: 'Error: ' + e.message };
+        outputs.value[key] = { envelope: null, raw: 'Error: ' + e.message, logged: null };
     } finally {
         running.value = false;
     }
@@ -138,7 +140,9 @@ async function runTinker() {
 
                 <LogViewer v-else-if="activeTab === 'logs'" :active-project="activeProject" :settings="settings" />
 
-                <Workbench v-else :active-project="activeProject" @run-code="runCode" />
+                <Workbench v-else-if="activeTab === 'workbench'" :active-project="activeProject" @run-code="runCode" />
+
+                <MailInbox v-else :active-project="activeProject" />
             </div>
 
             <StatusBar :active-project="activeProject" :running="running" :theme="settings.theme" />

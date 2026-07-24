@@ -6,16 +6,20 @@ export function csrfToken() {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
-export async function postJson(url, body = {}) {
-    const res = await fetch(url, {
-        method: 'POST',
+export async function sendJson(method, url, body = null) {
+    const init = {
+        method,
         headers: {
-            'Content-Type': 'application/json',
             Accept: 'application/json',
             'X-XSRF-TOKEN': csrfToken(),
         },
-        body: JSON.stringify(body),
-    });
+    };
+    if (body !== null) {
+        init.headers['Content-Type'] = 'application/json';
+        init.body = JSON.stringify(body);
+    }
+
+    const res = await fetch(url, init);
 
     let data = null;
     try {
@@ -25,4 +29,16 @@ export async function postJson(url, body = {}) {
     }
 
     return { ok: res.ok, status: res.status, data };
+}
+
+export function postJson(url, body = {}) {
+    return sendJson('POST', url, body);
+}
+
+export function getJson(url) {
+    return sendJson('GET', url);
+}
+
+export function deleteJson(url) {
+    return sendJson('DELETE', url);
 }

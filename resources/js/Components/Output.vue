@@ -6,6 +6,7 @@ import { computed, ref, watch } from 'vue';
 import OutputTable from './OutputTable.vue';
 import TreeNode from './TreeNode.vue';
 import OutputQueries from './OutputQueries.vue';
+import RunLogCorrelation from './RunLogCorrelation.vue';
 
 const props = defineProps({
     // { envelope: object|null, raw: string }
@@ -86,5 +87,7 @@ watch(
         </template>
 
         <div v-else class="p-3 font-mono text-xs text-neutral-400">Output will appear here. Press ⌘↵ to run.</div>
+
+        <RunLogCorrelation v-if="!running && result?.logged" :text="result.logged" />
     </div>
 </template>

@@ -49,6 +49,14 @@ defineEmits(['run', 'update:activeTab', 'update:layout']);
             >
                 Workbench
             </button>
+            <button
+                type="button"
+                class="rounded px-3 py-1"
+                :class="activeTab === 'mail' ? 'bg-white shadow-sm dark:bg-neutral-700' : 'text-neutral-500'"
+                @click="$emit('update:activeTab', 'mail')"
+            >
+                Mail
+            </button>
         </div>
 
         <button

@@ -3,6 +3,7 @@
 use App\Http\Controllers\ConsoleController;
 use App\Http\Controllers\EditorController;
 use App\Http\Controllers\LogController;
+use App\Http\Controllers\MailController;
 use App\Http\Controllers\NotifyController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\SettingsController;
@@ -32,3 +33,12 @@ Route::post('/workbench/model', [WorkbenchController::class, 'model'])->name('wo
 Route::post('/workbench/migrations', [WorkbenchController::class, 'migrations'])->name('workbench.migrations');
 Route::post('/workbench/migrate', [WorkbenchController::class, 'migrate'])->name('workbench.migrate');
 Route::post('/workbench/rollback', [WorkbenchController::class, 'rollback'])->name('workbench.rollback');
+
+Route::post('/mail/status', [MailController::class, 'status'])->name('mail.status');
+Route::post('/mail/start', [MailController::class, 'start'])->name('mail.start');
+Route::post('/mail/connect', [MailController::class, 'connect'])->name('mail.connect');
+Route::post('/mail/config', [MailController::class, 'config'])->name('mail.config');
+Route::get('/mail/messages', [MailController::class, 'messages'])->name('mail.messages');
+Route::get('/mail/message/{id}', [MailController::class, 'message'])->name('mail.message');
+Route::get('/mail/message/{id}/raw', [MailController::class, 'raw'])->name('mail.raw');
+Route::delete('/mail/messages', [MailController::class, 'destroy'])->name('mail.destroy');

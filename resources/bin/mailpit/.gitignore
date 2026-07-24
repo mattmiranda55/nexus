@@ -1,0 +1,6 @@
+# The binaries are large and fetched at build time — don't commit them.
+# Keep the tooling and license notice tracked.
+mac/
+win/
+linux/
+LICENSE.mailpit
