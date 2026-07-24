@@ -149,3 +149,106 @@ them — builds and test runs are done by the owner.)
 - The two feature tests that browse a real database point at this repo itself and read
   the `migrations` table via `db:show`/tinker — they assume `database/database.sqlite`
   exists and is migrated (it is, in this checkout).
+
+---
+
+# Round 2 — the dump receiver
+
+_The owner opened a second free-rein round (and rightly reminded me between rounds
+that committing is never my job — round 1's commit was undone; the work now sits
+uncommitted in the working tree). Item 1 from "What I'd do next" — the Ray-style
+dump receiver — is the obvious pick, and this time it gets the full pass I didn't
+have room for in round 1._
+
+## R2.1 The unlock: no client package needed
+
+My round-1 hesitation was "needs a listener socket + per-project client package."
+Reading Symfony VarDumper's source killed the second half of that: `VarDumper::register()`
+already checks `$_SERVER['VAR_DUMPER_FORMAT']` — when it's `server`, every `dump()`/`dd()`
+in the app is wrapped in a `ServerDumper` pointed at `VAR_DUMPER_SERVER` (default
+`127.0.0.1:9912`). Laravel loads `.env` into `$_SERVER` before the first dump, and
+var-dumper ships with every Laravel app. So the *entire* client side is two `.env` lines —
+which Nexus's existing `EnvWriter` (built for Mailpit auto-wiring in M5) can write.
+And `ServerDumper` falls back to normal in-page dumps when the server is down, so
+connecting a project costs nothing when Nexus isn't running.
+
+That flips the feature from "too much surface" to "pure orchestration": every piece
+maps onto muscle the app already has —
+
+| Need | Existing muscle |
+| --- | --- |
+| Listen on TCP without blocking `artisan serve` | `ChildProcess` pattern from the log tail (M2) — and `ChildProcess::artisan()` exists, so the listener is just a Nexus artisan command |
+| Decode payloads | `Symfony\...\Server\DumpServer` is already in `vendor/` (var-dumper ships it) |
+| Push to the UI | `nativeEvents.js` MessageReceived fan-out, same as the tail |
+| Wire up a project | `EnvWriter`, same read/repair line-editing as MAIL_* |
+| Jump to the `dump()` call site | `/editor/open` (A3 click-to-source) — the dump context includes file + line |
+
+## R2.2 Design decisions
+
+- **Transport format:** the artisan command (`nexus:dump-server`) emits one JSON object
+  per line on stdout: `{type: 'dump', ts, source: {name, file, line}, text}` plus a
+  `{type: 'ready'}` handshake. Line-oriented JSON because the Electron bridge delivers
+  arbitrary chunks — the viewer buffers partials exactly like the log tail does.
+- **Rendering:** `CliDumper` text (colors off) in a `<pre>`, not `HtmlDumper`. HtmlDumper's
+  collapsible output needs its own injected JS, which dies under `v-html` and would push
+  me toward per-dump iframes. Text keeps fidelity, matches the app's monospace aesthetic,
+  and the interesting structure lives one click away anyway (the call site opens in the
+  editor). Possible later upgrade: map `Data` into the Tier B tree.
+- **Formatter as a service** (`DumpFormatter`), not inline in the command — so the
+  Data→array conversion is unit-testable with a real `VarCloner` without sockets.
+- **Server lifecycle:** started idempotently when the Dumps tab mounts (stop-then-start,
+  like the log tail); `persistent: true` so a crashed listener resurrects. One global
+  server, not per-project — dumps carry their source path, and the panel tags each entry
+  with which project it came from.
+- **Safety:** `DumpServer::listen` already restricts `unserialize` to `Data`/`Stub`
+  classes; the callback wraps formatting in a catch so one weird payload can't kill the
+  listener.
+
+## R2.3 Build log
+
+- ✅ **Verified the unlock before building.** Confirmed in `vendor/` that
+  `VarDumper::register()` honors `VAR_DUMPER_FORMAT=server` + `VAR_DUMPER_SERVER`, that
+  `Server\DumpServer` ships with var-dumper (payload `unserialize` already restricted to
+  `Data`/`Stub`), and that NativePHP's `ChildProcess::artisan()` + fake's `assertArtisan`
+  exist. No assumptions survived unchecked.
+- ✅ **`DumpFormatter`** (service, unit-testable without sockets): `Data` + context →
+  `{type, ts, source{name,file,line}, text}`; CliDumper, colors off, 64KB cap with a
+  truncation marker so nobody's 50MB collection melts the renderer.
+- ✅ **`nexus:dump-server`** artisan command: `DumpServer::listen()` → one JSON object
+  per stdout line, `{type:'ready'}` handshake, `{type:'error'}` when the port's taken,
+  per-payload try/catch so a weird dump can't kill the listener.
+- ✅ **`EnvWriter`** grew `dumpStatus()` / `connectDumps()`, and the shared
+  write-only-what's-wrong loop got extracted into a private `apply()` (used by Mailpit
+  too — net code *removed* from `connectMailpit`). Subtlety handled: `VAR_DUMPER_SERVER`
+  absent still counts as connected when we host var-dumper's default (127.0.0.1:9912).
+- ✅ **`DumpController`**: status / start (stop-then-`ChildProcess::artisan`,
+  `persistent: true` so a dead listener resurrects) / stop / connect. One global
+  receiver, not per-project — entries carry their own source paths.
+- ✅ **Frontend.** `lib/lineBuffer.js` (chunk→line reassembly, bun-tested) →
+  `lib/dumpStream.js` — module-level reactive refs, started from `Console.vue` on mount,
+  **not** inside the tab: tabs are v-if-destroyed, and dumps that arrive while you're
+  elsewhere must still be captured. That also bought the Dumps tab an unseen-count badge
+  for free. `DumpsViewer.vue`: live feed (newest first), filter, pause/resume, clear,
+  one-click "Route {project}'s dump() here" (disabled with a reason when there's no
+  .env), click-to-source through the existing `/editor/open`, and an empty state that
+  teaches the feature.
+- ✅ **Proved it end-to-end** (allowed verification, not the test suite): launched
+  `nexus:dump-server` on a scratch port, ran `VAR_DUMPER_FORMAT=server php -r "dump([…])"`
+  in a second process, and watched the ready line + a correctly formatted dump entry
+  come out stdout. The TCP → decode → format → JSON-line chain is real, not theoretical.
+- ✅ **Tests written** (not run, per house rules): `DumpFormatterTest` (5 cases incl.
+  truncation), `EnvWriterTest` +6 dump-wiring cases (incl. the default-server subtlety
+  and idempotency), `DumpTest` feature coverage with `ChildProcess::fake()` +
+  `assertArtisan`, `lineBuffer.test.js` (4 cases incl. three-chunk splits).
+
+## R2.4 Notes for the owner
+
+- No new migrations this round; no new dependencies anywhere.
+- Try it: open the Dumps tab, click "Route {project}'s dump() here," then hit any page
+  of that project (or `dump()` in its tinker) — entries appear live with a call-site
+  link. `dd()` works too (it still halts the request after sending).
+- The `.env` change is safe to leave permanently: with Nexus closed, `ServerDumper`
+  falls back to normal in-browser dumps automatically.
+- If 9912 is ever taken by another dump-server, the panel will show the bind error
+  verbatim — that's the `{type:'error'}` path.
+- Left uncommitted on `fable`, stacked on round 1's changes, per the never-commit rule.

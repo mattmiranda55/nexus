@@ -10,6 +10,7 @@ import Toolbar from '../Components/Toolbar.vue';
 import Output from '../Components/Output.vue';
 import StatusBar from '../Components/StatusBar.vue';
 import { getJson, postJson } from '../lib/http.js';
+import { dumps as dumpEntries, startDumpStream } from '../lib/dumpStream.js';
 
 // Lazy-loaded so the CodeMirror editor (the bundle's heaviest dependency) and
 // the log viewer don't block the app shell's first paint.
@@ -17,6 +18,7 @@ const Editor = defineAsyncComponent(() => import('../Components/Editor.vue'));
 const LogViewer = defineAsyncComponent(() => import('../Components/LogViewer.vue'));
 const Workbench = defineAsyncComponent(() => import('../Components/Workbench/Workbench.vue'));
 const MailInbox = defineAsyncComponent(() => import('../Components/MailInbox.vue'));
+const DumpsViewer = defineAsyncComponent(() => import('../Components/DumpsViewer.vue'));
 
 const props = defineProps({
     projects: { type: Array, default: () => [] },
@@ -141,6 +143,23 @@ function restoreRun(run) {
 
 watch(() => props.activeProjectId, loadSnippets, { immediate: true });
 
+// --- Dumps -----------------------------------------------------------------
+
+// Collection is session-wide (lib/dumpStream); the page only tracks which
+// entries the user has seen so the Dumps tab can wear an unseen-count badge.
+const lastSeenDumpId = ref(0);
+
+const unseenDumps = computed(() => {
+    if (activeTab.value === 'dumps') return 0;
+    return dumpEntries.value.filter((d) => d.id > lastSeenDumpId.value).length;
+});
+
+watch([activeTab, dumpEntries], () => {
+    if (activeTab.value === 'dumps' && dumpEntries.value.length) {
+        lastSeenDumpId.value = dumpEntries.value[0].id;
+    }
+}, { deep: false });
+
 // --- Command palette -------------------------------------------------------
 
 // Recent runs are fetched when the palette opens so its History group is live.
@@ -195,6 +214,7 @@ const paletteCommands = computed(() => {
         { id: 'go-wb-db', group: 'Go to', label: 'Workbench: Database', keywords: 'tables sql browse', action: () => goWorkbench('database') },
         { id: 'go-wb-routes', group: 'Go to', label: 'Workbench: Routes', action: () => goWorkbench('routes') },
         { id: 'go-wb-migrations', group: 'Go to', label: 'Workbench: Migrations', action: () => goWorkbench('migrations') },
+        { id: 'go-dumps', group: 'Go to', label: 'Dumps', keywords: 'ray dump dd var', action: () => { activeTab.value = 'dumps'; } },
         { id: 'go-mail', group: 'Go to', label: 'Mail', keywords: 'inbox mailpit', action: () => { activeTab.value = 'mail'; } },
     );
 
@@ -252,7 +272,12 @@ function onGlobalKeydown(event) {
     }
 }
 
-onMounted(() => window.addEventListener('keydown', onGlobalKeydown, true));
+onMounted(() => {
+    window.addEventListener('keydown', onGlobalKeydown, true);
+    // Start collecting dumps immediately — the badge counts arrivals even
+    // while the user is on another tab.
+    startDumpStream();
+});
 onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown, true));
 </script>
 
@@ -272,6 +297,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown, tru
                 v-model:active-tab="activeTab"
                 v-model:layout="layout"
                 :has-project="!!activeProject"
+                :dumps-badge="unseenDumps"
                 @run="runTinker"
                 @save-snippet="saveSnippetOpen = true"
                 @history="historyOpen = true"
@@ -307,6 +333,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown, tru
                     :active-project="activeProject"
                     @run-code="runCode"
                 />
+
+                <DumpsViewer v-else-if="activeTab === 'dumps'" :active-project="activeProject" />
 
                 <MailInbox v-else :active-project="activeProject" />
             </div>

@@ -77,4 +77,56 @@ class EnvWriterTest extends TestCase
         $this->assertFalse($result['ok']);
         $this->assertNotNull($result['error']);
     }
+
+    public function test_dump_status_connected_with_explicit_server(): void
+    {
+        $this->writeEnv("VAR_DUMPER_FORMAT=server\nVAR_DUMPER_SERVER=127.0.0.1:9912\n");
+
+        $this->assertTrue((new EnvWriter)->dumpStatus($this->dir, '127.0.0.1:9912')['connected']);
+    }
+
+    public function test_dump_status_connected_when_server_key_is_absent_and_we_host_the_default(): void
+    {
+        // var-dumper defaults VAR_DUMPER_SERVER to 127.0.0.1:9912, so
+        // format=server alone counts as connected on the default host.
+        $this->writeEnv("VAR_DUMPER_FORMAT=server\n");
+
+        $this->assertTrue((new EnvWriter)->dumpStatus($this->dir, '127.0.0.1:9912')['connected']);
+        $this->assertFalse((new EnvWriter)->dumpStatus($this->dir, '127.0.0.1:9999')['connected']);
+    }
+
+    public function test_dump_status_not_connected_without_server_format(): void
+    {
+        $this->writeEnv("APP_NAME=Demo\n");
+
+        $status = (new EnvWriter)->dumpStatus($this->dir, '127.0.0.1:9912');
+
+        $this->assertTrue($status['exists']);
+        $this->assertFalse($status['connected']);
+    }
+
+    public function test_connect_dumps_writes_both_keys_and_preserves_the_rest(): void
+    {
+        $this->writeEnv("APP_NAME=Demo\nVAR_DUMPER_FORMAT=html\n");
+
+        $result = (new EnvWriter)->connectDumps($this->dir, '127.0.0.1:9912');
+        $env = file_get_contents($this->dir.'/.env');
+
+        $this->assertTrue($result['ok']);
+        $this->assertEqualsCanonicalizing(['VAR_DUMPER_FORMAT', 'VAR_DUMPER_SERVER'], $result['changed']);
+        $this->assertStringContainsString('VAR_DUMPER_FORMAT=server', $env);
+        $this->assertStringContainsString('VAR_DUMPER_SERVER=127.0.0.1:9912', $env);
+        $this->assertStringContainsString('APP_NAME=Demo', $env);
+        $this->assertStringNotContainsString('VAR_DUMPER_FORMAT=html', $env);
+    }
+
+    public function test_connect_dumps_is_idempotent(): void
+    {
+        $this->writeEnv("VAR_DUMPER_FORMAT=server\nVAR_DUMPER_SERVER=127.0.0.1:9912\n");
+
+        $result = (new EnvWriter)->connectDumps($this->dir, '127.0.0.1:9912');
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame([], $result['changed']);
+    }
 }

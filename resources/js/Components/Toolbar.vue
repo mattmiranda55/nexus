@@ -4,6 +4,7 @@ defineProps({
     activeTab: { type: String, default: 'tinker' },
     hasProject: { type: Boolean, default: false },
     layout: { type: String, default: 'vertical' },
+    dumpsBadge: { type: Number, default: 0 },
 });
 
 defineEmits(['run', 'update:activeTab', 'update:layout', 'save-snippet', 'history', 'palette']);
@@ -48,6 +49,18 @@ defineEmits(['run', 'update:activeTab', 'update:layout', 'save-snippet', 'histor
                 @click="$emit('update:activeTab', 'workbench')"
             >
                 Workbench
+            </button>
+            <button
+                type="button"
+                class="relative rounded px-3 py-1"
+                :class="activeTab === 'dumps' ? 'bg-white shadow-sm dark:bg-neutral-700' : 'text-neutral-500'"
+                @click="$emit('update:activeTab', 'dumps')"
+            >
+                Dumps
+                <span
+                    v-if="dumpsBadge && activeTab !== 'dumps'"
+                    class="absolute -right-1 -top-1 min-w-4 rounded-full bg-emerald-600 px-1 text-center text-[10px] font-medium leading-4 text-white"
+                >{{ dumpsBadge > 99 ? '99+' : dumpsBadge }}</span>
             </button>
             <button
                 type="button"

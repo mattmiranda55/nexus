@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ConsoleController;
+use App\Http\Controllers\DumpController;
 use App\Http\Controllers\EditorController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\LogController;
@@ -54,3 +55,8 @@ Route::delete('/snippets/{snippet}', [SnippetController::class, 'destroy'])->nam
 
 Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
 Route::delete('/history', [HistoryController::class, 'destroy'])->name('history.destroy');
+
+Route::post('/dumps/status', [DumpController::class, 'status'])->name('dumps.status');
+Route::post('/dumps/start', [DumpController::class, 'start'])->name('dumps.start');
+Route::post('/dumps/stop', [DumpController::class, 'stop'])->name('dumps.stop');
+Route::post('/dumps/connect', [DumpController::class, 'connect'])->name('dumps.connect');

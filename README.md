@@ -45,6 +45,12 @@ On top of the roadmap features (structured output, deep logs, workbench, mail):
 - **Run history** — every tinker run is recorded (code, ok, duration), kept to
   the last 100 per project. Toolbar clock icon or the palette restores old code
   into the editor; nothing re-runs without an explicit ⌘↵.
+- **Dumps tab (Ray-style receiver)** — one click writes `VAR_DUMPER_FORMAT=server`
+  to a project's `.env`, and every `dump()`/`dd()` in that app streams live into
+  Nexus with a click-to-source link. No package needed in the target project —
+  it's plain `symfony/var-dumper` talking to `nexus:dump-server` (a ChildProcess,
+  like the log tail). Safe to leave connected: dumps fall back to normal output
+  whenever Nexus isn't running.
 
 After pulling: `php artisan migrate` (adds `snippets` + `runs`).
 
