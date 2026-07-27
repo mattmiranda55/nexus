@@ -16,6 +16,23 @@ test('parses source locations from both frame shapes', () => {
     expect(parseFrame('no path here')).toBeNull();
 });
 
+test('parses Windows drive-rooted source locations', () => {
+    expect(parseFrame('#0 C:\\app\\Foo.php(123): Bar->baz()')).toEqual({
+        file: 'C:\\app\\Foo.php',
+        line: 123,
+    });
+    expect(parseFrame('Uncaught error in C:\\app\\Http\\Kernel.php:88')).toEqual({
+        file: 'C:\\app\\Http\\Kernel.php',
+        line: 88,
+    });
+    // Forward-slash Windows paths turn up too (Laravel normalises some of them).
+    expect(parseFrame('#0 D:/app/Foo.php(7): bar()')).toEqual({ file: 'D:/app/Foo.php', line: 7 });
+});
+
+test('does not mistake a drive letter colon for the line separator', () => {
+    expect(parseFrame('#0 C:\\app\\Foo.php(123): Bar->baz()').line).toBe(123);
+});
+
 test('collects stack frames from continuation lines', () => {
     const content = [
         '[2026-07-19 12:00:00] local.ERROR: Boom',

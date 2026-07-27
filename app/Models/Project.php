@@ -9,10 +9,15 @@ class Project extends Model
     protected $fillable = ['name', 'path', 'mail_url'];
 
     /**
-     * The conventional path to this project's Laravel log file.
+     * The conventional path to this project's Laravel log file, in the host
+     * OS's own separator style — this string is shown to the user and handed to
+     * the log tailer, so `C:\app/storage/logs/laravel.log` won't do.
      */
     public function logPath(): string
     {
-        return rtrim($this->path, '/').'/storage/logs/laravel.log';
+        $base = rtrim($this->path, '/\\');
+        $parts = ['storage', 'logs', 'laravel.log'];
+
+        return $base.DIRECTORY_SEPARATOR.implode(DIRECTORY_SEPARATOR, $parts);
     }
 }

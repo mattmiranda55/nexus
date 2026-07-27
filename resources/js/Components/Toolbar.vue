@@ -1,12 +1,19 @@
 <script setup>
-defineProps({
+import { computed } from 'vue';
+
+const props = defineProps({
     running: { type: Boolean, default: false },
     activeTab: { type: String, default: 'tinker' },
     hasProject: { type: Boolean, default: false },
     layout: { type: String, default: 'vertical' },
+    platform: { type: String, default: 'Darwin' }, // PHP_OS_FAMILY
 });
 
 defineEmits(['run', 'update:activeTab', 'update:layout', 'history']);
+
+// CodeMirror binds Mod-Enter, which is ⌘ on macOS and Ctrl everywhere else —
+// so the hint has to follow suit rather than always showing the Mac glyph.
+const runKey = computed(() => (props.platform === 'Darwin' ? '⌘↵' : 'Ctrl+↵'));
 </script>
 
 <template>
@@ -15,7 +22,7 @@ defineEmits(['run', 'update:activeTab', 'update:layout', 'history']);
             type="button"
             class="flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
             :disabled="running || !hasProject"
-            :title="hasProject ? 'Run (⌘↵)' : 'Select a project first'"
+            :title="hasProject ? `Run (${runKey})` : 'Select a project first'"
             @click="$emit('run')"
         >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5">
@@ -82,6 +89,6 @@ defineEmits(['run', 'update:activeTab', 'update:layout', 'history']);
         <span
             class="text-xs text-neutral-400"
             :class="activeTab === 'tinker' ? '' : 'ml-auto'"
-        >⌘↵ to run</span>
+        >{{ runKey }} to run</span>
     </div>
 </template>

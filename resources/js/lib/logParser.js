@@ -34,8 +34,12 @@ export function parseLogLine(line) {
 
 // Pulls an absolute source location out of a line — both PHP stack-frame shapes:
 //   "#0 /app/Foo.php(123): Bar->baz()"  and  "... in /app/Foo.php:123"
+// POSIX roots ("/app/Foo.php") and Windows drive roots ("C:\app\Foo.php") both
+// occur, depending on where the project runs. The drive letter's colon is
+// consumed by the prefix so it can't be mistaken for the line separator.
+// Known limit on both platforms: paths containing spaces won't match.
 export function parseFrame(text) {
-    const match = (text || '').match(/(\/[^\s:()]+\.php)[:(](\d+)\)?/);
+    const match = (text || '').match(/((?:[A-Za-z]:[\\/]|\/)[^\s:()]*\.php)[:(](\d+)\)?/);
     if (!match) return null;
     return { file: match[1], line: Number(match[2]) };
 }

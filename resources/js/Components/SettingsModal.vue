@@ -1,8 +1,10 @@
 <script setup>
+import { computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
     settings: { type: Object, required: true },
+    platform: { type: String, default: 'Darwin' },
 });
 
 const emit = defineEmits(['close']);
@@ -12,7 +14,19 @@ const form = useForm({
     phpPath: props.settings.phpPath ?? '',
     editor: props.settings.editor ?? 'phpstorm',
     notifyErrors: props.settings.notifyErrors ?? true,
+    logShell: props.settings.logShell ?? 'gitbash',
 });
+
+// Unix always has a real `tail`, so the picker is Windows-only.
+const isWindows = computed(() => props.platform === 'Windows');
+
+const SHELL_NOTES = {
+    gitbash: 'Uses the GNU tail that ships with Git for Windows. Follows the log by path, so it keeps streaming across rotation.',
+    wsl: 'Reads the log through /mnt/…. Reliable, but picks up new lines a little slower than Git Bash.',
+    powershell: 'Get-Content -Wait follows the open file handle, so streaming stops silently when the log rotates — with no error. Use Git Bash or WSL if either is installed.',
+};
+
+const shellNote = computed(() => SHELL_NOTES[form.logShell] ?? '');
 
 function save() {
     form.patch('/settings', {
@@ -63,6 +77,26 @@ function save() {
                         <option value="sublime">Sublime Text</option>
                         <option value="textmate">TextMate</option>
                     </select>
+                </div>
+
+                <div v-if="isWindows">
+                    <label class="block text-xs font-medium text-neutral-500">Log streaming shell</label>
+                    <select
+                        v-model="form.logShell"
+                        class="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-neutral-700"
+                    >
+                        <option value="gitbash">Git Bash — recommended</option>
+                        <option value="wsl">WSL</option>
+                        <option value="powershell">PowerShell — not recommended</option>
+                    </select>
+                    <p
+                        class="mt-1 text-[11px] leading-snug"
+                        :class="form.logShell === 'powershell'
+                            ? 'text-amber-600 dark:text-amber-500'
+                            : 'text-neutral-500'"
+                    >
+                        {{ shellNote }}
+                    </p>
                 </div>
 
                 <label class="flex items-center gap-2 text-sm">

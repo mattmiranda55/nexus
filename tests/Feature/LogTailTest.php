@@ -32,13 +32,36 @@ class LogTailTest extends TestCase
             ->assertOk()
             ->assertJson(['status' => 'started']);
 
+        $suffix = implode(DIRECTORY_SEPARATOR, ['', 'storage', 'logs', 'laravel.log']);
+
         ChildProcess::assertStarted(
             fn ($cmd, $alias, $cwd, $env, $persistent) => $alias === 'tail'
                 && is_array($cmd)
-                && $cmd[0] === 'tail'
-                && in_array('-F', $cmd, true)
-                && str_ends_with((string) end($cmd), '/storage/logs/laravel.log'),
+                && $cmd !== []
+                // Windows routes through a shell (see LogTailCommand), so only
+                // assert on the bare-tail shape where that's what we build.
+                && (PHP_OS_FAMILY === 'Windows' || (
+                    $cmd[0] === 'tail'
+                    && in_array('-F', $cmd, true)
+                    && str_ends_with((string) end($cmd), $suffix)
+                )),
         );
+    }
+
+    public function test_start_reports_the_strategy_it_used(): void
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            // Which strategy succeeds there depends on what's installed; the
+            // per-strategy argv is covered by LogTailCommandTest instead.
+            $this->markTestSkipped('Strategy is environment-dependent on Windows.');
+        }
+
+        ChildProcess::fake();
+
+        $project = Project::create(['name' => 'self', 'path' => base_path()]);
+        Setting::current()->update(['active_project_id' => $project->id]);
+
+        $this->post('/logs/start')->assertOk()->assertJson(['strategy' => 'tail']);
     }
 
     public function test_stop_stops_the_tail_process(): void

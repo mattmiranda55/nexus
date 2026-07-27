@@ -16,19 +16,19 @@ class PhpBinaryResolver
 {
     public function resolve(string $projectPath): string
     {
-        $projectPath = rtrim($projectPath, '/');
+        $projectPath = rtrim($projectPath, '/\\');
         $candidates = [];
 
         // 1) Project-local shims (Herd preferred)
-        $candidates[] = "{$projectPath}/.herd/bin/php";
-        $candidates[] = "{$projectPath}/.config/herd/bin/php";
+        array_push($candidates, ...$this->variants("{$projectPath}/.herd/bin/php"));
+        array_push($candidates, ...$this->variants("{$projectPath}/.config/herd/bin/php"));
 
         // 2) Project vendor-provided php (non-Herd)
-        $candidates[] = "{$projectPath}/vendor/bin/php";
+        array_push($candidates, ...$this->variants("{$projectPath}/vendor/bin/php"));
 
         // 3) User-level Herd installation
         if ($home = $this->homeDir()) {
-            $candidates[] = "{$home}/.config/herd/bin/php";
+            array_push($candidates, ...$this->variants("{$home}/.config/herd/bin/php"));
         }
 
         // 4) OS-specific Herd bundle path
@@ -63,6 +63,20 @@ class PhpBinaryResolver
         throw new RuntimeException(
             'Unable to find PHP executable; set NEXUS_PHP_PATH or configure an explicit binary in Settings.'
         );
+    }
+
+    /**
+     * Executable spellings for a suffix-less base path. Windows needs the
+     * extension spelled out — `is_file('…/bin/php')` is false there even when
+     * `php.exe` (or a Herd `.bat` shim) sits right next to it.
+     *
+     * @return array<int, string>
+     */
+    private function variants(string $base): array
+    {
+        return PHP_OS_FAMILY === 'Windows'
+            ? ["{$base}.exe", "{$base}.bat", "{$base}.cmd"]
+            : [$base];
     }
 
     private function homeDir(): ?string

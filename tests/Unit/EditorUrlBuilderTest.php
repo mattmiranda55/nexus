@@ -32,4 +32,40 @@ class EditorUrlBuilderTest extends TestCase
 
         $this->assertStringStartsWith('phpstorm://', $b->build('mystery', '/app/Foo.php'));
     }
+
+    public function test_windows_paths_get_forward_slashes_and_a_leading_slash(): void
+    {
+        $b = new EditorUrlBuilder;
+
+        // Without the leading slash this would glue into "vscode://fileC:\…".
+        $this->assertSame(
+            'vscode://file/C:/app/Foo.php:12',
+            $b->build('vscode', 'C:\\app\\Foo.php', 12),
+        );
+        $this->assertSame(
+            'vscodium://file/C:/app/Foo.php:12',
+            $b->build('vscodium', 'C:\\app\\Foo.php', 12),
+        );
+    }
+
+    public function test_windows_file_urls_are_posix_shaped(): void
+    {
+        $b = new EditorUrlBuilder;
+
+        $this->assertSame(
+            'subl://open?url=file://%2FC%3A%2Fapp%2FFoo.php&line=12',
+            $b->build('sublime', 'C:\\app\\Foo.php', 12),
+        );
+    }
+
+    public function test_phpstorm_keeps_the_native_windows_path(): void
+    {
+        $b = new EditorUrlBuilder;
+
+        // Query-parameter style, so PhpStorm wants the path as the OS spells it.
+        $this->assertSame(
+            'phpstorm://open?file=C%3A%5Capp%5CFoo.php&line=12',
+            $b->build('phpstorm', 'C:\\app\\Foo.php', 12),
+        );
+    }
 }

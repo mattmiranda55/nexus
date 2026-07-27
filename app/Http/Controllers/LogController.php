@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\Setting;
+use App\Services\LogTailCommand;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\File;
 use Native\Desktop\Facades\ChildProcess;
@@ -13,14 +14,19 @@ class LogController extends Controller
     private const ALIAS = 'tail';
 
     /**
-     * Tail the active project's laravel.log as an Electron-side child process.
-     * `tail -n 200 -F` backfills the last 200 lines, then follows (and survives
-     * rotation). New output is pushed to the UI via ChildProcess MessageReceived
-     * events, so it never occupies the single-threaded PHP server.
+     * Tail the active project's laravel.log as an Electron-side child process,
+     * backfilling the last 200 lines and then following. New output is pushed
+     * to the UI via ChildProcess MessageReceived events, so it never occupies
+     * the single-threaded PHP server.
+     *
+     * The actual command is platform-dependent (see LogTailCommand): plain
+     * `tail -F` on Unix, and on Windows whichever shell the user picked in
+     * Settings, since Windows has no tail of its own.
      */
-    public function start(): JsonResponse
+    public function start(LogTailCommand $tail): JsonResponse
     {
-        $activeId = Setting::current()->active_project_id;
+        $settings = Setting::current();
+        $activeId = $settings->active_project_id;
         $project = $activeId ? Project::find($activeId) : null;
 
         if (! $project) {
@@ -43,19 +49,34 @@ class LogController extends Controller
             ], 422);
         }
 
+        $command = $tail->build($path, $settings->log_shell);
+
+        // Nothing to run — e.g. Git Bash selected on Windows but not installed.
+        // That's a configuration problem, so say so rather than failing blank.
+        if (! $command['ok']) {
+            return response()->json([
+                'status' => 'error',
+                'error' => $command['error'],
+                'path' => $path,
+                'strategy' => $command['strategy'],
+            ], 422);
+        }
+
         try {
-            ChildProcess::start(['tail', '-n', '200', '-F', $path], self::ALIAS);
+            ChildProcess::start($command['argv'], self::ALIAS);
         } catch (\Throwable $e) {
             return response()->json([
                 'status' => 'error',
                 'error' => 'Could not start the log tail: '.$e->getMessage(),
                 'path' => $path,
+                'strategy' => $command['strategy'],
             ], 500);
         }
 
         return response()->json([
             'status' => 'started',
             'path' => $path,
+            'strategy' => $command['strategy'],
         ]);
     }
 

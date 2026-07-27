@@ -34,8 +34,11 @@ class ProjectsSettingsTest extends TestCase
 
     public function test_settings_update_persists(): void
     {
-        $this->patch('/settings', ['theme' => 'light', 'phpPath' => '/usr/bin/php'])
-            ->assertRedirect();
+        $this->patch('/settings', [
+            'theme' => 'light',
+            'phpPath' => '/usr/bin/php',
+            'editor' => 'phpstorm',
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
         $settings = Setting::current();
         $this->assertSame('light', $settings->theme);
@@ -46,6 +49,36 @@ class ProjectsSettingsTest extends TestCase
     {
         $this->patch('/settings', ['theme' => 'neon'])
             ->assertSessionHasErrors('theme');
+    }
+
+    public function test_log_shell_persists_and_defaults_when_omitted(): void
+    {
+        $base = ['theme' => 'dark', 'editor' => 'phpstorm'];
+
+        $this->patch('/settings', $base + ['logShell' => 'wsl'])->assertRedirect();
+        $this->assertSame('wsl', Setting::current()->log_shell);
+
+        // The picker is hidden off Windows, so the field simply won't be sent.
+        $this->patch('/settings', $base)->assertRedirect();
+        $this->assertSame('gitbash', Setting::current()->log_shell);
+    }
+
+    public function test_settings_update_rejects_an_unknown_log_shell(): void
+    {
+        $this->patch('/settings', [
+            'theme' => 'dark',
+            'editor' => 'phpstorm',
+            'logShell' => 'cmd',
+        ])->assertSessionHasErrors('logShell');
+    }
+
+    public function test_console_page_exposes_the_platform(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('platform', PHP_OS_FAMILY)
+                ->where('settings.logShell', 'gitbash'));
     }
 
     public function test_removing_active_project_clears_the_active_setting(): void

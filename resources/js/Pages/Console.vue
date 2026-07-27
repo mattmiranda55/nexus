@@ -18,6 +18,7 @@ const MailInbox = defineAsyncComponent(() => import('../Components/MailInbox.vue
 const props = defineProps({
     projects: { type: Array, default: () => [] },
     settings: { type: Object, default: () => ({ theme: 'dark', phpPath: null }) },
+    platform: { type: String, default: 'Darwin' }, // PHP_OS_FAMILY
     activeProjectId: { type: [Number, null], default: null },
 });
 
@@ -113,6 +114,7 @@ function restoreRun(run) {
                 v-model:active-tab="activeTab"
                 v-model:layout="layout"
                 :has-project="!!activeProject"
+                :platform="platform"
                 @run="runTinker"
                 @history="historyOpen = true"
             />
@@ -149,6 +151,7 @@ function restoreRun(run) {
         <SettingsModal
             v-if="settingsOpen"
             :settings="settings"
+            :platform="platform"
             @close="settingsOpen = false"
         />
 

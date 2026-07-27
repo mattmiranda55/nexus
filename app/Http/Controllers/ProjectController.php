@@ -28,7 +28,7 @@ class ProjectController extends Controller
             return to_route('console');
         }
 
-        if (! File::exists(rtrim($path, '/').'/artisan')) {
+        if (! File::exists(rtrim($path, '/\\').DIRECTORY_SEPARATOR.'artisan')) {
             return to_route('console')->with('error', 'That folder is not a Laravel project (no artisan file found).');
         }
 

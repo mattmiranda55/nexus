@@ -28,7 +28,7 @@ class TinkerRunner
      */
     public function runStructured(string $projectPath, string $code): array
     {
-        $projectPath = rtrim($projectPath, '/');
+        $projectPath = rtrim($projectPath, '/\\');
 
         if (! is_file("{$projectPath}/artisan")) {
             return $this->failure('Invalid Laravel project path');
@@ -65,7 +65,7 @@ class TinkerRunner
 
     public function run(string $projectPath, string $code): string
     {
-        $projectPath = rtrim($projectPath, '/');
+        $projectPath = rtrim($projectPath, '/\\');
 
         if (! is_file("{$projectPath}/artisan")) {
             return 'Error: Invalid Laravel project path';

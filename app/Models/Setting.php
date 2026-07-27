@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Setting extends Model
 {
-    protected $fillable = ['theme', 'php_path', 'active_project_id', 'editor', 'notify_errors'];
+    protected $fillable = ['theme', 'php_path', 'active_project_id', 'editor', 'notify_errors', 'log_shell'];
 
     protected $casts = ['notify_errors' => 'boolean'];
 
