@@ -15,7 +15,9 @@ const raw = ref('');
 const search = ref('');
 const activeLevels = ref(new Set());
 const expanded = ref(new Set());
-const status = ref('idle'); // idle | connecting | live | error
+const status = ref('idle'); // idle | connecting | live | missing | error
+const logPath = ref('');
+const errorMessage = ref('');
 const containerEl = ref(null);
 let unsubscribe = null;
 let lastNotifyAt = 0;
@@ -56,6 +58,7 @@ const statusMeta = computed(() => ({
     idle: { dot: 'bg-neutral-400', label: 'Idle' },
     connecting: { dot: 'bg-amber-500 animate-pulse', label: 'Connecting…' },
     live: { dot: 'bg-emerald-500', label: 'Live' },
+    missing: { dot: 'bg-neutral-400', label: 'No log file' },
     error: { dot: 'bg-red-500', label: 'Unavailable' },
 }[status.value]));
 
@@ -65,16 +68,28 @@ function appendChunk(chunk) {
     if (status.value !== 'live') status.value = 'live';
 }
 
+// The tail's own output can't confirm a successful start — a healthy tail on a
+// quiet log is silent — so the start response is what settles the status.
 async function start() {
     if (!props.activeProject) {
         status.value = 'idle';
         return;
     }
+
     status.value = 'connecting';
-    const { ok } = await postJson('/logs/start');
-    if (!ok || !nativeAvailable()) {
-        status.value = 'error';
+    errorMessage.value = '';
+
+    const { ok, data } = await postJson('/logs/start');
+    logPath.value = data?.path ?? '';
+
+    if (ok) {
+        status.value = 'live';
+        return;
     }
+
+    status.value = data?.status === 'missing' ? 'missing' : 'error';
+    errorMessage.value = data?.error
+        ?? 'Could not start the log tail. Live logs run inside the desktop app.';
 }
 
 async function stop() {
@@ -203,14 +218,42 @@ onBeforeUnmount(() => {
         <!-- Stream -->
         <div ref="containerEl" class="min-h-0 flex-1 overflow-auto bg-neutral-50 p-2 font-mono text-xs dark:bg-neutral-950">
             <div v-if="!rows.length" class="p-4 text-center text-neutral-400">
-                <template v-if="status === 'error'">
-                    Live logs run inside the desktop app.
-                </template>
-                <template v-else-if="!activeProject">
+                <template v-if="!activeProject">
                     Select a project to stream its logs.
                 </template>
+
+                <template v-else-if="status === 'missing'">
+                    <p class="text-neutral-500 dark:text-neutral-400">No log file found.</p>
+                    <p class="mt-1 break-all text-[11px]">{{ logPath }}</p>
+                    <p class="mt-1 text-[11px]">
+                        Laravel creates it on the first log write.
+                    </p>
+                    <button
+                        type="button"
+                        class="mt-3 rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                        @click="start"
+                    >
+                        Retry
+                    </button>
+                </template>
+
+                <template v-else-if="status === 'error'">
+                    <p class="text-red-500">{{ errorMessage }}</p>
+                    <button
+                        type="button"
+                        class="mt-3 rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                        @click="start"
+                    >
+                        Retry
+                    </button>
+                </template>
+
+                <template v-else-if="status === 'connecting'">
+                    Connecting…
+                </template>
+
                 <template v-else>
-                    Waiting for log output…
+                    Tailing {{ logPath }} — no output yet.
                 </template>
             </div>
 

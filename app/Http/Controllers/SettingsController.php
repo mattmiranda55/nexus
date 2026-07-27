@@ -24,6 +24,6 @@ class SettingsController extends Controller
             'notify_errors' => $data['notifyErrors'] ?? false,
         ]);
 
-        return back();
+        return to_route('console');
     }
 }

@@ -4,10 +4,9 @@ defineProps({
     activeTab: { type: String, default: 'tinker' },
     hasProject: { type: Boolean, default: false },
     layout: { type: String, default: 'vertical' },
-    dumpsBadge: { type: Number, default: 0 },
 });
 
-defineEmits(['run', 'update:activeTab', 'update:layout', 'save-snippet', 'history', 'palette']);
+defineEmits(['run', 'update:activeTab', 'update:layout', 'history']);
 </script>
 
 <template>
@@ -45,26 +44,6 @@ defineEmits(['run', 'update:activeTab', 'update:layout', 'save-snippet', 'histor
             <button
                 type="button"
                 class="rounded px-3 py-1"
-                :class="activeTab === 'workbench' ? 'bg-white shadow-sm dark:bg-neutral-700' : 'text-neutral-500'"
-                @click="$emit('update:activeTab', 'workbench')"
-            >
-                Workbench
-            </button>
-            <button
-                type="button"
-                class="relative rounded px-3 py-1"
-                :class="activeTab === 'dumps' ? 'bg-white shadow-sm dark:bg-neutral-700' : 'text-neutral-500'"
-                @click="$emit('update:activeTab', 'dumps')"
-            >
-                Dumps
-                <span
-                    v-if="dumpsBadge && activeTab !== 'dumps'"
-                    class="absolute -right-1 -top-1 min-w-4 rounded-full bg-emerald-600 px-1 text-center text-[10px] font-medium leading-4 text-white"
-                >{{ dumpsBadge > 99 ? '99+' : dumpsBadge }}</span>
-            </button>
-            <button
-                type="button"
-                class="rounded px-3 py-1"
                 :class="activeTab === 'mail' ? 'bg-white shadow-sm dark:bg-neutral-700' : 'text-neutral-500'"
                 @click="$emit('update:activeTab', 'mail')"
             >
@@ -76,19 +55,6 @@ defineEmits(['run', 'update:activeTab', 'update:layout', 'save-snippet', 'histor
             v-if="activeTab === 'tinker'"
             type="button"
             class="ml-auto rounded p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-            :disabled="!hasProject"
-            title="Save buffer as snippet"
-            @click="$emit('save-snippet')"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
-                <path fill-rule="evenodd" d="M10 2c-1.716 0-3.408.106-5.07.31C3.806 2.45 3 3.414 3 4.517V17.25a.75.75 0 0 0 1.075.676L10 15.082l5.925 2.844A.75.75 0 0 0 17 17.25V4.517c0-1.103-.806-2.068-1.93-2.207A41.403 41.403 0 0 0 10 2Z" clip-rule="evenodd" />
-            </svg>
-        </button>
-
-        <button
-            v-if="activeTab === 'tinker'"
-            type="button"
-            class="rounded p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
             :disabled="!hasProject"
             title="Run history"
             @click="$emit('history')"
@@ -113,13 +79,9 @@ defineEmits(['run', 'update:activeTab', 'update:layout', 'save-snippet', 'histor
             </svg>
         </button>
 
-        <button
-            type="button"
-            class="rounded px-1.5 py-0.5 text-xs text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+        <span
+            class="text-xs text-neutral-400"
             :class="activeTab === 'tinker' ? '' : 'ml-auto'"
-            title="Command palette"
-            @click="$emit('palette')"
-        >⌘K</button>
-        <span class="text-xs text-neutral-400">⌘↵ to run</span>
+        >⌘↵ to run</span>
     </div>
 </template>

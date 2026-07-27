@@ -25,11 +25,11 @@ class ProjectController extends Controller
         $path = is_array($path) ? ($path[0] ?? null) : $path;
 
         if (! $path) {
-            return back();
+            return to_route('console');
         }
 
         if (! File::exists(rtrim($path, '/').'/artisan')) {
-            return back()->with('error', 'That folder is not a Laravel project (no artisan file found).');
+            return to_route('console')->with('error', 'That folder is not a Laravel project (no artisan file found).');
         }
 
         $project = Project::firstOrCreate(
@@ -39,14 +39,20 @@ class ProjectController extends Controller
 
         Setting::current()->update(['active_project_id' => $project->id]);
 
-        return back();
+        return to_route('console');
     }
 
+    /**
+     * Redirect to the console route explicitly rather than `back()`: the app's
+     * JSON endpoints share the `web` group, so the session's previous URL can
+     * point at one of them — and a redirect there returns plain JSON, which the
+     * Inertia client discards, leaving the sidebar looking dead.
+     */
     public function activate(Project $project): RedirectResponse
     {
         Setting::current()->update(['active_project_id' => $project->id]);
 
-        return back();
+        return to_route('console');
     }
 
     public function destroy(Project $project): RedirectResponse
@@ -59,6 +65,6 @@ class ProjectController extends Controller
 
         $project->delete();
 
-        return back();
+        return to_route('console');
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\File;
 use Native\Desktop\Facades\ChildProcess;
 
 class LogController extends Controller
@@ -23,20 +24,38 @@ class LogController extends Controller
         $project = $activeId ? Project::find($activeId) : null;
 
         if (! $project) {
-            return response()->json(['error' => 'No project selected'], 422);
+            return response()->json(['status' => 'error', 'error' => 'No project selected'], 422);
         }
+
+        $path = $project->logPath();
 
         // Restart cleanly if a tail is already running.
         ChildProcess::stop(self::ALIAS);
 
-        ChildProcess::start(
-            ['tail', '-n', '200', '-F', $project->logPath()],
-            self::ALIAS,
-        );
+        // `tail -F` on a nonexistent path stays silent and waits for the file to
+        // appear, so the UI would sit on "Connecting…" forever. Answer up front
+        // instead: no file, no tail, and the path we looked for.
+        if (! File::exists($path)) {
+            return response()->json([
+                'status' => 'missing',
+                'error' => 'No log file at '.$path,
+                'path' => $path,
+            ], 422);
+        }
+
+        try {
+            ChildProcess::start(['tail', '-n', '200', '-F', $path], self::ALIAS);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'error' => 'Could not start the log tail: '.$e->getMessage(),
+                'path' => $path,
+            ], 500);
+        }
 
         return response()->json([
             'status' => 'started',
-            'path' => $project->logPath(),
+            'path' => $path,
         ]);
     }
 

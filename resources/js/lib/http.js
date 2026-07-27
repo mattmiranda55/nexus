@@ -12,6 +12,11 @@ export async function sendJson(method, url, body = null) {
         headers: {
             Accept: 'application/json',
             'X-XSRF-TOKEN': csrfToken(),
+            // Marks these as AJAX so Laravel's StartSession doesn't record them
+            // as the session's "previous URL". Without it, a GET like /history
+            // becomes the target of the next `back()`, and an Inertia visit that
+            // redirects there receives plain JSON — an invalid Inertia response.
+            'X-Requested-With': 'XMLHttpRequest',
         },
     };
     if (body !== null) {
