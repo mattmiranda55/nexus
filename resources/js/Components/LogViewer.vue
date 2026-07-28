@@ -1,6 +1,6 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { buildParsedLogs, levelStyle } from '../lib/logParser.js';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, triggerRef, watch } from 'vue';
+import { createLogAccumulator, levelStyle } from '../lib/logParser.js';
 import { postJson } from '../lib/http.js';
 import { nativeAvailable, onChildProcessMessage } from '../lib/nativeEvents.js';
 
@@ -11,7 +11,11 @@ const props = defineProps({
 
 const SEVERE = ['emergency', 'alert', 'critical', 'error'];
 
-const raw = ref('');
+/** How much history the parser keeps. */
+const MAX_ENTRIES = 2000;
+/** How much of it reaches the DOM — rows are unvirtualised, so this is a cap. */
+const MAX_ROWS = 500;
+
 const search = ref('');
 const activeLevels = ref(new Set());
 const expanded = ref(new Set());
@@ -19,10 +23,20 @@ const status = ref('idle'); // idle | connecting | live | missing | error
 const logPath = ref('');
 const errorMessage = ref('');
 const containerEl = ref(null);
+// Follow the tail only while the reader is already at the bottom, so scrolling
+// back to read something doesn't get yanked away by the next line.
+const pinned = ref(true);
 let unsubscribe = null;
 let lastNotifyAt = 0;
 
-const entries = computed(() => buildParsedLogs(raw.value));
+// The parser owns the entry list and mutates it in place; `entries` is a
+// shallowRef onto that same array, refreshed with triggerRef after each flush.
+// Deep reactivity here would mean Vue proxying every entry, detail line and
+// stack frame that streams past — all cost, no benefit, since nothing mutates
+// an entry after the parser is done with it.
+const accumulator = createLogAccumulator({ maxEntries: MAX_ENTRIES });
+const entries = shallowRef(accumulator.entries);
+
 const presentLevels = computed(() => [...new Set(entries.value.map((e) => e.level))]);
 
 const filtered = computed(() =>
@@ -38,21 +52,31 @@ const filtered = computed(() =>
 );
 
 // Collapse consecutive identical entries into one row carrying a repeat count —
-// the classic "same exception firing in a loop" case. Keyed by first-seen index
-// so expansion state stays stable as new lines stream in.
+// the classic "same exception firing in a loop" case.
 const rows = computed(() => {
     const out = [];
-    filtered.value.forEach((entry, i) => {
+    for (const entry of filtered.value) {
         const sig = `${entry.level}|${entry.message}|${entry.details.join('\n')}`;
         const prev = out[out.length - 1];
         if (prev && prev.sig === sig) {
             prev.count++;
         } else {
-            out.push({ entry, sig, count: 1, key: i });
+            // Keyed by the entry's own id, not its position: the parser drops
+            // old entries off the front, and a positional key would slide
+            // expansion state onto whatever row inherited the index.
+            out.push({ entry, sig, count: 1, key: entry.id });
         }
-    });
+    }
     return out;
 });
+
+// Rows render unvirtualised, so a long session would otherwise put thousands of
+// nodes in the DOM and make every update a full-tree diff. Show the newest.
+const visibleRows = computed(() =>
+    rows.value.length > MAX_ROWS ? rows.value.slice(-MAX_ROWS) : rows.value,
+);
+
+const hiddenRows = computed(() => rows.value.length - visibleRows.value.length);
 
 const statusMeta = computed(() => ({
     idle: { dot: 'bg-neutral-400', label: 'Idle' },
@@ -62,10 +86,41 @@ const statusMeta = computed(() => ({
     error: { dot: 'bg-red-500', label: 'Unavailable' },
 }[status.value]));
 
+// Parsing happens per chunk (cheap, each line is touched once); re-rendering is
+// batched to one frame. A burst of tail output would otherwise re-run the
+// filter/dedupe pipeline and re-render for every message the child process
+// emits, which on a chatty log is many times per frame.
+let flushHandle = null;
+let batch = [];
+
 function appendChunk(chunk) {
-    raw.value += chunk;
-    if (raw.value.length > 500000) raw.value = raw.value.slice(-500000);
+    const fresh = accumulator.push(chunk);
+    if (fresh.length) batch.push(...fresh);
     if (status.value !== 'live') status.value = 'live';
+
+    if (flushHandle !== null) return;
+
+    flushHandle = requestAnimationFrame(async () => {
+        flushHandle = null;
+        const opened = batch;
+        batch = [];
+
+        triggerRef(entries);
+
+        const severe = opened.find((e) => SEVERE.includes(e.level));
+        if (severe) maybeNotify(severe);
+
+        if (!pinned.value) return;
+        await nextTick();
+        if (containerEl.value) containerEl.value.scrollTop = containerEl.value.scrollHeight;
+    });
+}
+
+function onScroll() {
+    const el = containerEl.value;
+    if (!el) return;
+    // A small slack so sub-pixel scroll heights don't unpin at the bottom.
+    pinned.value = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
 }
 
 // The tail's own output can't confirm a successful start — a healthy tail on a
@@ -97,8 +152,11 @@ async function stop() {
 }
 
 function clear() {
-    raw.value = '';
+    accumulator.reset();
+    batch = [];
+    triggerRef(entries);
     expanded.value = new Set();
+    pinned.value = true;
 }
 
 function toggleLevel(level) {
@@ -118,7 +176,9 @@ function openInEditor(frame) {
     postJson('/editor/open', { file: frame.file, line: frame.line });
 }
 
-const shortPath = (file) => file.split('/').slice(-2).join('/');
+// Last two path segments, whichever separator the host OS uses. Splitting on
+// "/" alone left Windows frames ("C:\app\Foo.php") rendering as the full path.
+const shortPath = (file) => file.split(/[\\/]/).slice(-2).join('/');
 
 // A6: notify on newly-streamed severe entries (throttled so a burst is one ping).
 function maybeNotify(entry) {
@@ -132,32 +192,16 @@ function maybeNotify(entry) {
     });
 }
 
-watch(
-    () => entries.value.length,
-    (len, prev) => {
-        // Only look at genuinely new entries; ignore resets/trims (len <= prev).
-        if (len > (prev ?? 0)) {
-            const fresh = entries.value.slice(prev ?? 0);
-            const severe = fresh.find((e) => SEVERE.includes(e.level));
-            if (severe) maybeNotify(severe);
-        }
-    },
-);
-
-// Auto-scroll to the newest entry.
-watch(
-    () => rows.value.length,
-    async () => {
-        await nextTick();
-        if (containerEl.value) containerEl.value.scrollTop = containerEl.value.scrollHeight;
-    },
-);
+// Severe-entry notification and auto-scroll both used to be watchers over
+// `entries.length` / `rows.length`. Both now happen inside the batched flush in
+// appendChunk(), which already knows exactly which entries are new — no
+// diffing, and no watcher firing once per streamed line.
 
 // Restart the tail when the active project changes.
 watch(
     () => props.activeProject?.id,
     async () => {
-        raw.value = '';
+        clear();
         await start();
     },
 );
@@ -169,6 +213,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     unsubscribe?.();
+    if (flushHandle !== null) cancelAnimationFrame(flushHandle);
     stop();
 });
 </script>
@@ -216,7 +261,11 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Stream -->
-        <div ref="containerEl" class="min-h-0 flex-1 overflow-auto bg-neutral-50 p-2 font-mono text-xs dark:bg-neutral-950">
+        <div
+            ref="containerEl"
+            class="min-h-0 flex-1 overflow-auto bg-neutral-50 p-2 font-mono text-xs dark:bg-neutral-950"
+            @scroll.passive="onScroll"
+        >
             <div v-if="!rows.length" class="p-4 text-center text-neutral-400">
                 <template v-if="!activeProject">
                     Select a project to stream its logs.
@@ -257,8 +306,12 @@ onBeforeUnmount(() => {
                 </template>
             </div>
 
+            <p v-if="hiddenRows" class="pb-2 text-center text-[10px] text-neutral-400">
+                {{ hiddenRows }} older {{ hiddenRows === 1 ? 'entry' : 'entries' }} hidden — filter to narrow the view
+            </p>
+
             <div
-                v-for="row in rows"
+                v-for="row in visibleRows"
                 :key="row.key"
                 class="border-b border-neutral-100 py-1 last:border-0 dark:border-neutral-900"
             >

@@ -44,21 +44,39 @@ export function parseFrame(text) {
     return { file: match[1], line: Number(match[2]) };
 }
 
-export function buildParsedLogs(content) {
-    if (!content) return [];
-
-    const lines = content.split(/\r?\n/);
+/**
+ * Streaming parser over `tail` output.
+ *
+ * The obvious implementation — keep the raw text and re-run a whole-buffer
+ * parse whenever a chunk lands — is quadratic over a session: a busy log
+ * re-parses a growing buffer once per chunk and pins a core. This consumes each
+ * line exactly once instead, holding back the trailing partial line until its
+ * newline arrives (a chunk boundary lands mid-line often enough to matter).
+ *
+ * `maxEntries` bounds memory; the oldest entries fall off the front. Pass
+ * `Infinity` for a one-shot parse of complete text.
+ */
+export function createLogAccumulator({ maxEntries = 2000 } = {}) {
     const entries = [];
-    let current = null;
+    let current = null; // last header entry; continuation lines fold into it
+    let pending = ''; // bytes after the last newline — not yet a whole line
+    let dropped = 0;
+    let nextId = 0;
 
-    for (const rawLine of lines) {
-        if (!rawLine) continue;
+    function open(entry, fresh) {
+        entry.id = nextId++;
+        entries.push(entry);
+        current = entry;
+        fresh.push(entry);
+    }
+
+    function consume(rawLine, fresh) {
+        if (!rawLine) return;
 
         const parsed = parseLogLine(rawLine);
 
         if (parsed.isNew) {
-            if (current) entries.push(current);
-            current = {
+            open({
                 timestamp: parsed.timestamp,
                 env: parsed.env ?? '',
                 level: parsed.level.toLowerCase(),
@@ -67,7 +85,8 @@ export function buildParsedLogs(content) {
                 details: [],
                 stack: [],
                 raw: rawLine,
-            };
+            }, fresh);
+
             // A location can sit on the header line itself ("… in /f.php:12").
             const headFrame = parseFrame(parsed.message);
             if (headFrame) current.stack.push({ ...headFrame, raw: parsed.message });
@@ -77,7 +96,7 @@ export function buildParsedLogs(content) {
             if (frame) current.stack.push({ ...frame, raw: rawLine.trim() });
         } else {
             // Orphan continuation before any header — treat as a plain info line.
-            current = {
+            open({
                 timestamp: '',
                 env: '',
                 level: 'info',
@@ -86,13 +105,83 @@ export function buildParsedLogs(content) {
                 details: [],
                 stack: [],
                 raw: rawLine,
-            };
+            }, fresh);
         }
     }
 
-    if (current) entries.push(current);
+    function trim() {
+        const excess = entries.length - maxEntries;
+        if (excess > 0) {
+            entries.splice(0, excess);
+            dropped += excess;
+        }
+    }
 
-    return entries;
+    return {
+        /** The live entry array — mutated in place, never reallocated. */
+        get entries() {
+            return entries;
+        },
+
+        /** How many entries have aged out of the front of the window. */
+        get dropped() {
+            return dropped;
+        },
+
+        /**
+         * Feed a chunk of tail output.
+         *
+         * @returns {Array} the entries this chunk opened (for notifications) —
+         *   note continuation lines mutate an existing entry and return nothing.
+         */
+        push(chunk) {
+            const fresh = [];
+            pending += chunk;
+
+            const lines = pending.split(/\r?\n/);
+            pending = lines.pop() ?? ''; // trailing fragment waits for its newline
+            for (const line of lines) consume(line, fresh);
+
+            trim();
+
+            return fresh;
+        },
+
+        /** Consume a trailing fragment that will never get its newline. */
+        flush() {
+            const fresh = [];
+            if (pending) {
+                consume(pending, fresh);
+                pending = '';
+                trim();
+            }
+
+            return fresh;
+        },
+
+        /**
+         * Empties the window in place. The array identity is deliberately
+         * preserved — callers hold a reference to it (a Vue shallowRef, say)
+         * and swapping it out here would silently orphan them.
+         */
+        reset() {
+            entries.length = 0;
+            current = null;
+            pending = '';
+            dropped = 0;
+        },
+    };
+}
+
+/** One-shot parse of complete log text. */
+export function buildParsedLogs(content) {
+    if (!content) return [];
+
+    const acc = createLogAccumulator({ maxEntries: Infinity });
+    acc.push(content);
+    acc.flush();
+
+    return acc.entries;
 }
 
 // Returns Tailwind classes { dot, text } for a log level.

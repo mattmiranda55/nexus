@@ -1,7 +1,7 @@
 # Nexus (NativePHP) — Feature Roadmap
 
 _Spec generated 2026-07-19 for the **nexus-php** codebase (NativePHP + Laravel 13 +
-Inertia/Vue 3 + CodeMirror, bun). Scope: the three differentiating directions plus email —
+Inertia/Vue 3 + CodeMirror, npm). Scope: the three differentiating directions plus email —
 **B) rich output**, **A) deep logs**, **C) Laravel workbench**, **F) email**._
 
 ## Strategic frame
@@ -76,7 +76,7 @@ _Effort: medium-high. Highest leverage — C and F render through B2/B3._
 
 ### A1. Structured parsing — extend `resources/js/lib/logParser.js`
 - Group multi-line stack traces under their parent entry; collapse by default.
-- Emit `{ timestamp, level, env, message, stack[] }`. Extend `logParser.test.js` alongside (bun test).
+- Emit `{ timestamp, level, env, message, stack[] }`. Extend `logParser.test.js` alongside (`npm test`).
 
 ### A2. Filters & search — `LogViewer.vue`
 - Multi-select level, full-text search, time range. **Dedup:** collapse consecutive identical
@@ -174,7 +174,7 @@ _Effort: low-medium (~few days over a pure client). No SMTP server or MIME parsi
 ## Testing conventions
 - Backend services (`TinkerResultSerializer`, `ArtisanRunner`, `EnvWriter`, `MailpitManager`): PHPUnit
   under `tests/` (`php artisan test`).
-- Frontend parsers (`logParser.js` extensions): `bun test resources/js/lib`.
+- Frontend parsers (`logParser.js` extensions): `npm test`.
 
 ## Key risks / spikes
 - **B1 last-expression capture** — the one hard problem; prototype before committing to the tier.

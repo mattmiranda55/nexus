@@ -45,12 +45,23 @@ async function init() {
     return ensureRunning();
 }
 
+// Mailpit binds in well under a second, so poll tightly at first and back off
+// rather than sleeping a flat second eight times over. Every one of these
+// round-trips occupies the single-threaded PHP server, so the old version could
+// leave the whole app unresponsive for ~9s before admitting Mailpit wasn't
+// there — and it re-ran on every project switch.
+const STARTUP_BACKOFF_MS = [100, 200, 300, 500, 800, 1200];
+
 async function ensureRunning() {
     phase.value = 'starting';
     applyState((await postJson('/mail/start')).data);
 
-    for (let i = 0; i < 8 && !state.value.running; i++) {
-        await wait(1000);
+    // A missing binary is terminal — no amount of waiting will conjure one.
+    if (state.value.source === 'missing') { phase.value = 'missing'; return; }
+
+    for (const delay of STARTUP_BACKOFF_MS) {
+        if (state.value.running) break;
+        await wait(delay);
         applyState((await postJson('/mail/status')).data);
     }
 
@@ -118,9 +129,20 @@ function scheduleRefresh() {
     refreshTimer = setTimeout(loadMessages, 300);
 }
 
+// Fallback for when the direct websocket to Mailpit won't hold. Each tick is a
+// proxied round-trip (renderer → PHP → Mailpit → back) on a server that can
+// only do one thing at a time, so don't spend them while nobody is looking:
+// a backgrounded window polls nothing and catches up on focus.
 function startPolling() {
     if (pollTimer) return;
-    pollTimer = setInterval(loadMessages, 4000);
+    pollTimer = setInterval(() => {
+        if (document.visibilityState === 'visible') loadMessages();
+    }, 8000);
+    document.addEventListener('visibilitychange', pollOnReveal);
+}
+
+function pollOnReveal() {
+    if (document.visibilityState === 'visible') loadMessages();
 }
 
 function teardownLive() {
@@ -128,6 +150,7 @@ function teardownLive() {
     ws = null;
     clearInterval(pollTimer);
     clearTimeout(refreshTimer);
+    document.removeEventListener('visibilitychange', pollOnReveal);
     pollTimer = null;
 }
 

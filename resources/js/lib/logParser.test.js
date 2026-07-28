@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
-import { parseLogLine, parseFrame, buildParsedLogs, levelStyle } from './logParser.js';
+import { expect, test } from 'vitest';
+import { createLogAccumulator, parseLogLine, parseFrame, buildParsedLogs, levelStyle } from './logParser.js';
 
 test('parses a standard Laravel log header line', () => {
     const p = parseLogLine('[2026-07-19 12:00:00] local.ERROR: Boom');
@@ -72,6 +72,90 @@ test('folds continuation lines into the preceding entry', () => {
 
 test('returns empty for blank content', () => {
     expect(buildParsedLogs('')).toEqual([]);
+});
+
+test('accumulator matches a one-shot parse when fed the same text', () => {
+    const content = [
+        '[2026-07-19 12:00:00] local.ERROR: Boom',
+        'Stack trace:',
+        '#0 /app/foo.php(12): bar()',
+        '[2026-07-19 12:00:01] local.INFO: Recovered',
+    ].join('\n');
+
+    const acc = createLogAccumulator({ maxEntries: Infinity });
+    acc.push(content);
+    acc.flush();
+
+    expect(acc.entries.map((e) => e.message)).toEqual(buildParsedLogs(content).map((e) => e.message));
+    expect(acc.entries[0].details).toEqual(['Stack trace:', '#0 /app/foo.php(12): bar()']);
+});
+
+test('accumulator holds back a line split across chunks', () => {
+    const acc = createLogAccumulator();
+
+    // The newline hasn't arrived yet — nothing may be emitted.
+    acc.push('[2026-07-19 12:00:00] local.ERR');
+    expect(acc.entries).toHaveLength(0);
+
+    acc.push('OR: Boom\n');
+    expect(acc.entries).toHaveLength(1);
+    expect(acc.entries[0].level).toBe('error');
+    expect(acc.entries[0].message).toBe('Boom');
+});
+
+test('accumulator handles a CRLF chunk boundary', () => {
+    const acc = createLogAccumulator();
+    acc.push('[2026-07-19 12:00:00] local.INFO: One\r');
+    acc.push('\n[2026-07-19 12:00:01] local.INFO: Two\r\n');
+
+    expect(acc.entries.map((e) => e.message)).toEqual(['One', 'Two']);
+});
+
+test('accumulator returns only the entries a chunk opened', () => {
+    const acc = createLogAccumulator();
+
+    const first = acc.push('[2026-07-19 12:00:00] local.ERROR: Boom\n');
+    expect(first).toHaveLength(1);
+
+    // A continuation folds into the open entry rather than opening a new one.
+    const second = acc.push('#0 /app/foo.php(12): bar()\n');
+    expect(second).toHaveLength(0);
+    expect(acc.entries[0].stack).toHaveLength(1);
+});
+
+test('accumulator drops the oldest entries past its window', () => {
+    const acc = createLogAccumulator({ maxEntries: 3 });
+
+    for (let i = 0; i < 5; i++) {
+        acc.push(`[2026-07-19 12:00:0${i}] local.INFO: Line ${i}\n`);
+    }
+
+    expect(acc.entries.map((e) => e.message)).toEqual(['Line 2', 'Line 3', 'Line 4']);
+    expect(acc.dropped).toBe(2);
+});
+
+test('accumulator gives entries stable ids that survive trimming', () => {
+    const acc = createLogAccumulator({ maxEntries: 2 });
+
+    for (let i = 0; i < 4; i++) {
+        acc.push(`[2026-07-19 12:00:0${i}] local.INFO: Line ${i}\n`);
+    }
+
+    // Ids track the entry, not its position, so expansion state can't slide
+    // onto whatever row inherited an index.
+    expect(acc.entries.map((e) => e.id)).toEqual([2, 3]);
+});
+
+test('accumulator reset keeps the array identity callers hold', () => {
+    const acc = createLogAccumulator();
+    const held = acc.entries;
+
+    acc.push('[2026-07-19 12:00:00] local.INFO: One\n');
+    acc.reset();
+
+    expect(acc.entries).toBe(held);
+    expect(held).toHaveLength(0);
+    expect(acc.dropped).toBe(0);
 });
 
 test('maps levels to distinct colors', () => {

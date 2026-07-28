@@ -42,11 +42,24 @@ class MailpitManager
         return $this->smtpPort;
     }
 
-    /** Is a Mailpit answering on the API port right now? */
+    /**
+     * Is a Mailpit answering on the API port right now?
+     *
+     * Kept deliberately short. The app is served by PHP's built-in server,
+     * which handles one request at a time, so every millisecond spent waiting
+     * here is a millisecond the whole UI is unresponsive. This is a loopback
+     * check: if something is listening it answers in single-digit ms, and if
+     * nothing is the connection is refused outright. The only case that can
+     * actually burn the budget is a firewall silently dropping the packet —
+     * which is exactly the case we don't want to block on.
+     */
     public function detect(): bool
     {
         try {
-            return Http::timeout(1)->get($this->apiUrl().'/api/v1/info')->successful();
+            return Http::connectTimeout(0.25)
+                ->timeout(0.5)
+                ->get($this->apiUrl().'/api/v1/info')
+                ->successful();
         } catch (\Throwable $e) {
             return false;
         }

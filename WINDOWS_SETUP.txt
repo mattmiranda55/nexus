@@ -1,0 +1,90 @@
+NEXUS — WINDOWS SETUP / PERF CHECKLIST
+======================================
+
+Prerequisites: PHP 8.2+, Composer, Node 20+. The setup script checks for these
+and tells you what's missing; it won't install them for you.
+
+
+THE SHORT VERSION
+-----------------
+    npm run setup
+    composer native:dev
+
+Then do steps 1 and 2 below, which a script can't do.
+
+`npm run setup` is idempotent. It creates .env, installs Composer and npm
+dependencies, downloads the Mailpit binary for Windows, migrates both
+databases, and builds the frontend.
+
+
+1. ADD WINDOWS DEFENDER EXCLUSIONS
+----------------------------------
+Settings > Privacy & security > Virus & threat protection >
+Manage settings > Exclusions > Add exclusion > Folder
+
+Add:
+    <path to>\nexus
+    <path to>\nexus\vendor\nativephp\php-bin
+
+Why: dev mode has no config cache, so every request re-opens a lot of small PHP
+files and Defender scans each one. Probably the biggest remaining Mac/Windows
+performance gap.
+
+
+2. INSTALL GIT FOR WINDOWS (for the log viewer)
+-----------------------------------------------
+The log tab needs a real `tail`. The default strategy looks for Git Bash at
+%ProgramFiles%\Git\bin\bash.exe.
+
+If Git came from scoop / winget / GitHub Desktop it won't be found. Either:
+  - set NEXUS_GIT_BASH_PATH in .env, or
+  - pick a different log shell in Settings (wsl / powershell)
+
+PowerShell is badged "not recommended" because Get-Content -Wait follows the
+file handle, so log rotation silently kills the stream.
+
+
+3. IF YOU ALREADY HAD THE PROJECT CHECKED OUT HERE
+--------------------------------------------------
+Check .env for these — an older copy will still have `database`:
+
+    SESSION_DRIVER=file
+    CACHE_STORE=file
+
+Why: every request was doing SQLite round-trips for session + cache, and the
+resulting WAL churn also woke the Vite file watcher.
+
+Also delete bun.lock and node_modules if they're still around; the project is
+npm-only now.
+
+
+NOTES / GOTCHAS
+---------------
+* TWO DATABASES. The app running inside Electron reads
+  database/nativephp.sqlite; plain `php artisan` from a shell uses
+  database/database.sqlite. NativePHP only repoints the connection when
+  NATIVEPHP_RUNNING is set, which is only true for the PHP process Electron
+  spawns. `npm run setup` migrates both. If you add a migration later:
+
+      php artisan native:migrate      <- the one the app actually reads
+
+  NativePHP only auto-migrates when the file is missing, so migrations added
+  after that file was created never run on their own.
+
+* DO NOT run `php artisan config:cache`. `nativephp-internal.running` reads
+  env('NATIVEPHP_RUNNING'), which is unset in your shell, so caching bakes in
+  `false` and the app silently switches to the wrong SQLite file.
+
+* USE `composer native:dev`, not `native:dev:deps`. The former passes -D so
+  NativePHP skips re-running a full `npm install` inside its Electron directory
+  on every launch. Use `native:dev:deps` only after bumping nativephp/desktop.
+
+
+STILL BROKEN (known, not fixed)
+-------------------------------
+- Tinker runs block the whole UI for their duration. PHP is served by `php -S`,
+  which handles one request at a time, and PHP_CLI_SERVER_WORKERS is fork-based
+  so Windows can never have more than one worker. Needs a refactor to run tinker
+  as a ChildProcess like the log tail.
+
+- Project switching — not investigated yet.
