@@ -27,7 +27,7 @@ class TinkerController extends Controller
 
         // A4 run↔log correlation: snapshot the log size, then read exactly what
         // this run appended to it — fusing the REPL and the log viewer.
-        $logPath = $project->logPath();
+        $logPath = file_exists($project->logPath()) ? $project->logPath() : $project->legacyLogPath();
         $before = $logs->size($logPath);
 
         $started = hrtime(true);

@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('settings', function (Blueprint $table) {
             // Editor scheme for click-to-source (phpstorm | vscode | ...).
-            $table->string('editor')->default('phpstorm');
+            $table->string('editor')->default('vscode');
             // Fire an OS notification when a streamed log hits error/critical.
             $table->boolean('notify_errors')->default(true);
         });

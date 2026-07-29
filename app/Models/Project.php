@@ -20,4 +20,11 @@ class Project extends Model
 
         return $base.DIRECTORY_SEPARATOR.implode(DIRECTORY_SEPARATOR, $parts);
     }
+
+    public function legacyLogPath(): string {
+        $base = rtrim($this->path, '/\\');
+        $parts = ['app', 'storage', 'logs', 'laravel.log'];
+
+        return $base.DIRECTORY_SEPARATOR.implode(DIRECTORY_SEPARATOR, $parts);
+    }
 }

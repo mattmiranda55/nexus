@@ -20,7 +20,8 @@ class EditorUrlBuilder
             'sublime' => 'subl://open?url=file://'.rawurlencode($path)."&line={$line}",
             'textmate' => 'txmt://open?url=file://'.rawurlencode($path)."&line={$line}",
             // Query-style: PhpStorm takes the native path, so no conversion.
-            default => 'phpstorm://open?file='.rawurlencode($file)."&line={$line}",
+            'phpstorm' => 'phpstorm://open?file='.rawurlencode($file)."&line={$line}",
+            default => "vscode://file{$path}:{$line}"
         };
     }
 

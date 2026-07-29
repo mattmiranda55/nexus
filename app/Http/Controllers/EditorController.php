@@ -22,7 +22,7 @@ class EditorController extends Controller
             'line' => 'nullable|integer|min:1',
         ]);
 
-        $editor = Setting::current()->editor ?: 'phpstorm';
+        $editor = Setting::current()->editor ?: 'vscode';
         $url = $urls->build($editor, $data['file'], $data['line'] ?? 1);
 
         try {

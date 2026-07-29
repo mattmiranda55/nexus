@@ -33,7 +33,7 @@ class LogController extends Controller
             return response()->json(['status' => 'error', 'error' => 'No project selected'], 422);
         }
 
-        $path = $project->logPath();
+        $path = file_exists($project->logPath()) ? $project->logPath() : $project->legacyLogPath();
 
         // Restart cleanly if a tail is already running.
         ChildProcess::stop(self::ALIAS);
