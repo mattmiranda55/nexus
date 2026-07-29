@@ -47,46 +47,65 @@ watch(
 </script>
 
 <template>
-    <div class="flex h-full flex-col bg-neutral-50 dark:bg-neutral-950">
-        <div v-if="running" class="p-3 font-mono text-xs text-neutral-400">Running…</div>
+    <div class="flex h-full min-h-0 flex-col bg-surface">
+        <!-- Plate 02 legend. Always present, so the pane keeps its identity
+             before the first run; the view tabs join it once there's a result. -->
+        <div class="nx-caption h-[30px]">
+            <span class="nx-caption-idx">02</span>
+            <span class="nx-cap">Result</span>
 
-        <template v-else-if="envelope || raw">
-            <!-- Tab bar + type chip -->
-            <div class="flex items-center gap-2 border-b border-neutral-200 px-2 py-1 dark:border-neutral-800">
+            <nav v-if="!running && (envelope || raw)" class="ml-2 flex h-full items-stretch gap-4">
                 <button
                     v-for="v in views"
                     :key="v.key"
                     type="button"
-                    class="rounded px-2 py-1 text-xs"
-                    :class="active === v.key ? 'bg-neutral-200 font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : 'text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200'"
+                    class="nx-tab"
+                    :class="{ 'nx-tab-on': active === v.key }"
                     @click="active = v.key"
                 >
                     {{ v.label }}
                 </button>
-                <span
-                    v-if="meta"
-                    class="ml-auto truncate rounded bg-neutral-100 px-2 py-0.5 font-mono text-[11px] text-neutral-500 dark:bg-neutral-900"
-                    :title="meta.phpType"
-                >{{ meta.phpType }}</span>
+            </nav>
+
+            <span class="nx-leader"></span>
+
+            <span
+                v-if="meta && !running"
+                class="nx-cap max-w-[14rem] truncate normal-case tracking-normal text-ink-2"
+                :title="meta.phpType"
+            >{{ meta.phpType }}</span>
+        </div>
+
+        <!-- Running: placeholder rules rather than a bare word -->
+        <div v-if="running" class="min-h-0 flex-1 space-y-2 p-3">
+            <div class="nx-skeleton h-2.5 w-1/3"></div>
+            <div class="nx-skeleton h-2.5 w-3/5"></div>
+            <div class="nx-skeleton h-2.5 w-1/4"></div>
+        </div>
+
+        <!-- Active view -->
+        <div v-else-if="envelope || raw" class="min-h-0 flex-1 overflow-hidden">
+            <OutputTable v-if="active === 'table' && table" :table="table" />
+
+            <div v-else-if="active === 'tree' && root" class="h-full overflow-auto p-2.5 font-mono text-[11.5px]">
+                <TreeNode :node="root" :depth="0" />
             </div>
 
-            <!-- Active view -->
-            <div class="min-h-0 flex-1 overflow-hidden">
-                <OutputTable v-if="active === 'table' && table" :table="table" />
+            <OutputQueries v-else-if="active === 'queries'" :queries="queries" />
 
-                <div v-else-if="active === 'tree' && root" class="h-full overflow-auto p-2 font-mono text-xs">
-                    <TreeNode :node="root" :depth="0" />
-                </div>
-
-                <OutputQueries v-else-if="active === 'queries'" :queries="queries" />
-
-                <div v-else class="h-full overflow-auto p-3 font-mono text-xs">
-                    <pre class="whitespace-pre-wrap break-words text-neutral-800 dark:text-neutral-200">{{ raw }}</pre>
-                </div>
+            <div v-else class="h-full overflow-auto p-3 font-mono text-[11.5px] leading-relaxed">
+                <pre class="whitespace-pre-wrap break-words text-ink">{{ raw }}</pre>
             </div>
-        </template>
+        </div>
 
-        <div v-else class="p-3 font-mono text-xs text-neutral-400">Output will appear here. Press ⌘↵ to run.</div>
+        <!-- Nothing run yet -->
+        <div v-else class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2.5 p-4 text-center">
+            <span class="h-2 w-2 rotate-45 border border-rule-2"></span>
+            <span class="nx-cap">Awaiting run</span>
+            <span class="flex items-center gap-1.5 text-[11px] text-ink-3">
+                Press <kbd class="nx-kbd">⌘↵</kbd> to evaluate
+            </span>
+        </div>
 
         <RunLogCorrelation v-if="!running && result?.logged" :text="result.logged" />
     </div>

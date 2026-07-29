@@ -188,11 +188,11 @@ export function buildParsedLogs(content) {
 export function levelStyle(level) {
     const l = (level || '').toLowerCase();
     if (['emergency', 'alert', 'critical', 'error'].includes(l)) {
-        return { dot: 'bg-red-500', text: 'text-red-500' };
+        return { dot: 'bg-err', text: 'text-err' };
     }
-    if (l === 'warning') return { dot: 'bg-amber-500', text: 'text-amber-500' };
-    if (l === 'notice') return { dot: 'bg-yellow-500', text: 'text-yellow-500' };
-    if (l === 'info') return { dot: 'bg-emerald-500', text: 'text-emerald-500' };
-    if (l === 'debug') return { dot: 'bg-sky-500', text: 'text-sky-500' };
-    return { dot: 'bg-neutral-500', text: 'text-neutral-500' };
+    if (l === 'warning') return { dot: 'bg-warn', text: 'text-warn' };
+    if (l === 'notice') return { dot: 'bg-num', text: 'text-num' };
+    if (l === 'info') return { dot: 'bg-ok', text: 'text-ok' };
+    if (l === 'debug') return { dot: 'bg-key', text: 'text-key' };
+    return { dot: 'bg-ink-3', text: 'text-ink-3' };
 }

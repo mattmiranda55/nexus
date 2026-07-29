@@ -101,7 +101,7 @@ function restoreRun(run) {
 <template>
     <Head title="Nexus" />
 
-    <div class="flex h-screen w-screen overflow-hidden bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+    <div class="flex h-screen w-screen overflow-hidden bg-paper font-sans text-ink">
         <Sidebar
             :projects="projects"
             :active-project-id="activeProjectId"
@@ -125,18 +125,29 @@ function restoreRun(run) {
                         class="flex min-h-0 flex-1"
                         :class="layout === 'vertical' ? 'flex-col' : 'flex-row'"
                     >
-                        <div
-                            class="min-h-0 min-w-0 flex-1 border-neutral-200 dark:border-neutral-800"
+                        <!-- Plate 01 — source. Captions are the drawing legend
+                             for each pane; Output supplies its own as 02. -->
+                        <section
+                            class="flex min-h-0 min-w-0 flex-1 flex-col border-rule"
                             :class="layout === 'vertical' ? 'border-b' : 'border-r'"
                         >
-                            <Editor v-model="code" :dark="isDark" @run="runTinker" />
-                        </div>
-                        <div
-                            class="min-h-0 min-w-0"
+                            <div class="nx-caption">
+                                <span class="nx-caption-idx">01</span>
+                                <span class="nx-cap">Source</span>
+                                <span class="nx-leader"></span>
+                                <span class="nx-cap">{{ activeProject ? 'php' : 'no project' }}</span>
+                            </div>
+                            <div class="min-h-0 flex-1">
+                                <Editor v-model="code" :dark="isDark" @run="runTinker" />
+                            </div>
+                        </section>
+
+                        <section
+                            class="flex min-h-0 min-w-0 flex-col"
                             :class="layout === 'vertical' ? 'h-2/5' : 'w-2/5'"
                         >
                             <Output :result="output" :running="running" />
-                        </div>
+                        </section>
                     </div>
                 </template>
 
@@ -163,10 +174,11 @@ function restoreRun(run) {
 
         <div
             v-if="flashError"
-            class="pointer-events-none fixed inset-x-0 top-3 flex justify-center"
+            class="pointer-events-none fixed inset-x-0 top-4 z-[60] flex justify-center px-4"
         >
-            <div class="rounded-md bg-red-600 px-3 py-1.5 text-sm text-white shadow-lg">
-                {{ flashError }}
+            <div class="nx-plate nx-rise flex max-w-lg items-start gap-2.5 border-err/60 bg-err-soft px-3 py-2">
+                <span class="mt-px shrink-0 text-err">⚠</span>
+                <span class="text-xs leading-snug text-ink">{{ flashError }}</span>
             </div>
         </div>
     </div>

@@ -39,50 +39,66 @@ onMounted(load);
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 bg-black/30" @click="emit('close')">
+    <div class="nx-scrim nx-fade fixed inset-0 z-50" @click="emit('close')">
         <div
-            class="mx-auto mt-[12vh] flex max-h-[60vh] w-[40rem] max-w-[90vw] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900"
+            class="nx-plate nx-rise mx-auto mt-[12vh] flex max-h-[62vh] w-[42rem] max-w-[92vw] flex-col overflow-hidden"
             @click.stop
         >
-            <div class="flex items-center justify-between border-b border-neutral-200 px-4 py-2.5 dark:border-neutral-700">
-                <h2 class="text-sm font-semibold">Run history</h2>
+            <div class="flex shrink-0 items-center gap-3 border-b border-rule bg-paper px-4 py-2.5">
+                <span class="h-2 w-2 shrink-0 rotate-45 bg-accent"></span>
+                <h2 class="font-display text-[15px] text-ink">Run history</h2>
+                <span class="nx-leader"></span>
                 <button
                     v-if="runs.length"
                     type="button"
-                    class="rounded px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-red-600 dark:hover:bg-neutral-800"
+                    class="nx-btn nx-btn-danger"
                     @click="clearAll"
                 >
                     Clear all
                 </button>
             </div>
 
-            <div class="min-h-0 flex-1 overflow-y-auto py-1">
-                <div v-if="status === 'loading'" class="px-4 py-6 text-center text-sm text-neutral-400">Loading…</div>
-                <div v-else-if="status === 'error'" class="px-4 py-6 text-center text-sm text-red-500">Could not load history.</div>
-                <div v-else-if="!runs.length" class="px-4 py-6 text-center text-sm text-neutral-400">
-                    No runs yet — history appears here after you run code.
+            <div class="min-h-0 flex-1 overflow-y-auto">
+                <div v-if="status === 'loading'" class="space-y-2 p-4">
+                    <div class="nx-skeleton h-2.5 w-2/5"></div>
+                    <div class="nx-skeleton h-2.5 w-3/5"></div>
+                    <div class="nx-skeleton h-2.5 w-1/3"></div>
+                </div>
+                <div v-else-if="status === 'error'" class="p-8 text-center">
+                    <span class="nx-cap text-err">Could not load history</span>
+                </div>
+                <div v-else-if="!runs.length" class="p-8 text-center">
+                    <span class="nx-cap">No runs yet</span>
+                    <p class="mt-2 text-[11px] text-ink-3">History appears here after you run code.</p>
                 </div>
 
                 <button
                     v-for="run in runs"
                     :key="run.id"
                     type="button"
-                    class="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    class="flex w-full items-center gap-3 border-b border-rule px-4 py-2 text-left last:border-0 hover:bg-accent-soft"
                     title="Restore into the editor (does not run)"
                     @click="emit('restore', run)"
                 >
                     <span
-                        class="h-1.5 w-1.5 shrink-0 rounded-full"
-                        :class="run.ok ? 'bg-emerald-500' : 'bg-red-500'"
+                        class="h-2.5 w-[3px] shrink-0"
+                        :class="run.ok ? 'bg-ok' : 'bg-err'"
                         :title="run.ok ? 'Completed' : 'Failed'"
                     ></span>
-                    <code class="truncate font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ preview(run.code) }}</code>
-                    <span class="ml-auto shrink-0 text-[10px] text-neutral-400">{{ run.duration_ms }}ms · {{ age(run.created_at) }}</span>
+                    <code class="truncate font-mono text-[11.5px] text-ink">{{ preview(run.code) }}</code>
+                    <span class="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-ink-3">
+                        {{ run.duration_ms }}ms
+                        <span class="text-rule-2">·</span>
+                        {{ age(run.created_at) }}
+                    </span>
                 </button>
             </div>
 
-            <div class="border-t border-neutral-200 px-4 py-1.5 text-[10px] text-neutral-400 dark:border-neutral-700">
-                Click a run to restore its code into the editor. Nothing re-runs until you press ⌘↵.
+            <div class="shrink-0 border-t border-rule bg-paper px-4 py-2">
+                <p class="nx-cap normal-case tracking-normal">
+                    Click a run to restore its code. Nothing re-runs until you press
+                    <kbd class="nx-kbd">⌘↵</kbd>.
+                </p>
             </div>
         </div>
     </div>

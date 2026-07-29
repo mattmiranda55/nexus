@@ -7,10 +7,137 @@
    which Console.vue toggles from the persisted theme setting. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ===========================================================================
+   Nexus design language — "plate"
+   ---------------------------------------------------------------------------
+   Ink on paper, not glass on slate. Every surface is a warm neutral; geometry
+   is squared; separation comes from hairline rules rather than shadows and
+   elevation. Chrome speaks in mono micro-caps so the only proportional type on
+   screen is content. A single vermillion accent carries every action, active
+   state and focus ring — nothing else competes for it.
+
+   Semantic tokens live as `--nx-*` custom properties and are re-declared under
+   `.dark`, so components ask for `bg-surface` / `text-ink-2` once and both
+   themes follow. Raw palette utilities (bg-neutral-800, text-emerald-500…)
+   should not appear in components.
+   =========================================================================== */
+
 @theme {
-    --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
-    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji';
+    --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+    /* Wordmark + modal titles only. System serif, so nothing is downloaded. */
+    --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, ui-serif, serif;
+
+    /* Surfaces, deepest → highest */
+    --color-paper: var(--nx-paper);
+    --color-surface: var(--nx-surface);
+    --color-raised: var(--nx-raised);
+
+    /* Ink, primary → tertiary */
+    --color-ink: var(--nx-ink);
+    --color-ink-2: var(--nx-ink-2);
+    --color-ink-3: var(--nx-ink-3);
+
+    /* Hairlines */
+    --color-rule: var(--nx-rule);
+    --color-rule-2: var(--nx-rule-2);
+
+    /* The one accent */
+    --color-accent: var(--nx-accent);
+    --color-accent-ink: var(--nx-accent-ink);
+    --color-accent-soft: var(--nx-accent-soft);
+
+    /* Data types — used by the tree, table cells and SQL panel */
+    --color-num: var(--nx-num);
+    --color-str: var(--nx-str);
+    --color-bool: var(--nx-bool);
+    --color-key: var(--nx-key);
+
+    /* Signals */
+    --color-ok: var(--nx-ok);
+    --color-warn: var(--nx-warn);
+    --color-warn-soft: var(--nx-warn-soft);
+    --color-err: var(--nx-err);
+    --color-err-soft: var(--nx-err-soft);
+}
+
+/* --- Light: oat paper, warm ink ------------------------------------------ */
+:root {
+    color-scheme: light;
+
+    --nx-paper: #efe9dc;
+    --nx-surface: #f8f4ec;
+    --nx-raised: #e6dfd0;
+
+    --nx-ink: #201c17;
+    --nx-ink-2: #574f45;
+    /* Tertiary carries the 10px chrome labels, so it holds ≥4.5:1 against every
+       surface rather than drifting into decorative grey. */
+    --nx-ink-3: #696156;
+
+    --nx-rule: #ddd4c2;
+    --nx-rule-2: #c6bba4;
+
+    --nx-accent: #c04420;
+    --nx-accent-ink: #fdf8f0;
+    --nx-accent-soft: #f6e0d5;
+
+    --nx-num: #96650a;
+    --nx-str: #3d6b4c;
+    --nx-bool: #77488a;
+    --nx-key: #2f6274;
+
+    --nx-ok: #47752f;
+    --nx-warn: #a06813;
+    --nx-warn-soft: #f6e8cf;
+    --nx-err: #af2f1c;
+    --nx-err-soft: #f7ddd7;
+
+    --nx-select: #e2d9c4;
+    --nx-active-line: rgb(32 28 23 / 0.045);
+    --nx-scrim: rgb(32 28 23 / 0.28);
+    --nx-plate-shadow: 0 18px 40px -16px rgb(32 28 23 / 0.35);
+    --nx-grain: 0.05;
+    --nx-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none' stroke='%23696156' stroke-width='1.4'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+/* --- Dark: espresso, not blue-black -------------------------------------- */
+.dark {
+    color-scheme: dark;
+
+    --nx-paper: #14110e;
+    --nx-surface: #1b1713;
+    --nx-raised: #241f19;
+
+    --nx-ink: #efe7da;
+    --nx-ink-2: #b0a595;
+    --nx-ink-3: #95897a;
+
+    --nx-rule: #2d2721;
+    --nx-rule-2: #423a30;
+
+    --nx-accent: #f0703c;
+    --nx-accent-ink: #1a1008;
+    --nx-accent-soft: #35211a;
+
+    --nx-num: #dda85c;
+    --nx-str: #8bbd91;
+    --nx-bool: #c495d8;
+    --nx-key: #8bb6cb;
+
+    --nx-ok: #82bd6c;
+    --nx-warn: #e0a53f;
+    --nx-warn-soft: #2d2312;
+    --nx-err: #ef6b52;
+    --nx-err-soft: #30170f;
+
+    --nx-select: #3a3126;
+    --nx-active-line: rgb(255 255 255 / 0.035);
+    --nx-scrim: rgb(10 8 6 / 0.6);
+    --nx-plate-shadow: 0 24px 60px -18px rgb(0 0 0 / 0.75);
+    --nx-grain: 0.035;
+    --nx-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none' stroke='%2395897a' stroke-width='1.4'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
 }
 
 html,
@@ -20,4 +147,382 @@ body {
 
 body {
     overflow: hidden;
+    background-color: var(--nx-paper);
+    color: var(--nx-ink);
+}
+
+/* Paper tooth. A single fixed, non-interactive film of fractal noise — enough
+   to keep large flat surfaces from reading as plastic, low enough to be
+   invisible over text. */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: var(--nx-grain);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+    background-color: var(--nx-select);
+    color: var(--nx-ink);
+}
+
+/* Thin, squared scrollbars that sit inside the palette instead of on top of it. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--nx-rule-2) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--nx-rule-2);
+    border: 3px solid transparent;
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--nx-ink-3);
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* One focus treatment everywhere: a squared accent ring, never a glow. */
+:focus-visible {
+    outline: 2px solid var(--nx-accent);
+    outline-offset: 1px;
+}
+
+@layer components {
+    /* --- Chrome typography ---------------------------------------------- */
+
+    /* Every label that isn't content: uppercase mono micro-caps. */
+    .nx-cap {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        line-height: 1;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--nx-ink-3);
+    }
+
+    .nx-wordmark {
+        font-family: var(--font-display);
+        font-size: 17px;
+        letter-spacing: 0.01em;
+        color: var(--nx-ink);
+    }
+
+    /* A drawing caption: index, label, then a leader rule to the edge. */
+    .nx-caption {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+        padding: 0 12px;
+        height: 26px;
+        background-color: var(--nx-paper);
+        border-bottom: 1px solid var(--nx-rule);
+    }
+
+    .nx-caption-idx {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: var(--nx-accent);
+    }
+
+    .nx-leader {
+        flex: 1 1 auto;
+        min-width: 8px;
+        height: 1px;
+        background-color: var(--nx-rule);
+    }
+
+    .nx-kbd {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        padding: 2px 5px;
+        color: var(--nx-ink-3);
+        border: 1px solid var(--nx-rule);
+        background-color: var(--nx-raised);
+    }
+
+    /* --- Buttons -------------------------------------------------------- */
+
+    .nx-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 26px;
+        padding: 0 10px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--nx-ink-2);
+        background-color: transparent;
+        border: 1px solid var(--nx-rule-2);
+        transition:
+            color 120ms ease,
+            background-color 120ms ease,
+            border-color 120ms ease;
+    }
+
+    .nx-btn:hover:not(:disabled) {
+        color: var(--nx-ink);
+        border-color: var(--nx-ink-3);
+        background-color: var(--nx-raised);
+    }
+
+    .nx-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .nx-btn-accent {
+        color: var(--nx-accent-ink);
+        background-color: var(--nx-accent);
+        border-color: var(--nx-accent);
+    }
+
+    .nx-btn-accent:hover:not(:disabled) {
+        color: var(--nx-accent-ink);
+        background-color: var(--nx-accent);
+        border-color: var(--nx-accent);
+        filter: brightness(1.1);
+    }
+
+    .nx-btn-danger:hover:not(:disabled) {
+        color: var(--nx-err);
+        border-color: var(--nx-err);
+        background-color: var(--nx-err-soft);
+    }
+
+    /* Icon-only chrome button — squared hover plate, no rounding. */
+    .nx-icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 26px;
+        width: 26px;
+        color: var(--nx-ink-3);
+        border: 1px solid transparent;
+        transition:
+            color 120ms ease,
+            background-color 120ms ease,
+            border-color 120ms ease;
+    }
+
+    .nx-icon-btn:hover:not(:disabled) {
+        color: var(--nx-ink);
+        background-color: var(--nx-raised);
+        border-color: var(--nx-rule);
+    }
+
+    .nx-icon-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+    }
+
+    /* --- Tabs: underlined mono labels, never pills ---------------------- */
+
+    .nx-tab {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        height: 100%;
+        padding: 0 2px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--nx-ink-3);
+        transition: color 120ms ease;
+    }
+
+    .nx-tab::after {
+        content: '';
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+        height: 2px;
+        background-color: transparent;
+        transition: background-color 120ms ease;
+    }
+
+    .nx-tab:hover {
+        color: var(--nx-ink-2);
+    }
+
+    .nx-tab-on {
+        color: var(--nx-ink);
+    }
+
+    .nx-tab-on::after {
+        background-color: var(--nx-accent);
+    }
+
+    /* --- Fields --------------------------------------------------------- */
+
+    .nx-field {
+        height: 26px;
+        padding: 0 8px;
+        font-size: 12px;
+        color: var(--nx-ink);
+        background-color: var(--nx-raised);
+        border: 1px solid var(--nx-rule);
+        transition: border-color 120ms ease;
+    }
+
+    .nx-field::placeholder {
+        color: var(--nx-ink-3);
+    }
+
+    /* A doubled accent edge instead of a glow — squared, and unmistakable from
+       the keyboard without adding a second focus artefact on top of the ring. */
+    .nx-field:focus {
+        outline: none;
+        border-color: var(--nx-accent);
+        box-shadow: inset 0 0 0 1px var(--nx-accent);
+    }
+
+    .nx-field-mono {
+        font-family: var(--font-mono);
+        font-size: 11px;
+    }
+
+    /* Native select chrome ignores the palette, so draw our own caret. */
+    select.nx-field {
+        appearance: none;
+        padding-right: 24px;
+        background-image: var(--nx-caret);
+        background-repeat: no-repeat;
+        background-position: right 7px center;
+        background-size: 9px;
+    }
+
+    /* Native checkbox, recoloured rather than replaced. */
+    .nx-check {
+        accent-color: var(--nx-accent);
+        width: 14px;
+        height: 14px;
+    }
+
+    /* --- Plates & overlays ---------------------------------------------- */
+
+    .nx-plate {
+        background-color: var(--nx-surface);
+        border: 1px solid var(--nx-rule-2);
+        box-shadow: var(--nx-plate-shadow);
+    }
+
+    .nx-scrim {
+        background-color: var(--nx-scrim);
+        backdrop-filter: blur(2px);
+    }
+
+    /* Selected row marker: a 2px accent bar in the left gutter. */
+    .nx-marked {
+        box-shadow: inset 2px 0 0 var(--nx-accent);
+    }
+
+    /* --- Motion --------------------------------------------------------- */
+
+    .nx-fade {
+        animation: nx-fade 140ms ease-out both;
+    }
+
+    .nx-rise {
+        animation: nx-rise 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    /* Indeterminate run indicator — a 2px accent sweep under the toolbar. */
+    .nx-sweep {
+        position: relative;
+        overflow: hidden;
+        background-color: var(--nx-rule);
+    }
+
+    .nx-sweep::after {
+        content: '';
+        position: absolute;
+        inset-block: 0;
+        width: 40%;
+        background-color: var(--nx-accent);
+        animation: nx-sweep 1100ms ease-in-out infinite;
+    }
+
+    .nx-blink {
+        animation: nx-blink 1.4s ease-in-out infinite;
+    }
+
+    /* Loading placeholder bar. */
+    .nx-skeleton {
+        background-image: linear-gradient(
+            90deg,
+            var(--nx-raised) 0%,
+            var(--nx-rule) 40%,
+            var(--nx-raised) 80%
+        );
+        background-size: 300% 100%;
+        animation: nx-shimmer 1.4s linear infinite;
+    }
+}
+
+@keyframes nx-fade {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes nx-rise {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.995);
+    }
+}
+
+@keyframes nx-sweep {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(250%);
+    }
+}
+
+@keyframes nx-blink {
+    50% {
+        opacity: 0.35;
+    }
+}
+
+@keyframes nx-shimmer {
+    to {
+        background-position: -300% 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nx-fade,
+    .nx-rise,
+    .nx-blink,
+    .nx-sweep::after,
+    .nx-skeleton {
+        animation: none;
+    }
 }

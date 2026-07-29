@@ -102,39 +102,42 @@ function exportJson() {
 </script>
 
 <template>
-    <div class="flex h-full flex-col">
+    <div class="flex h-full min-h-0 flex-col">
         <!-- Controls -->
-        <div class="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-3 py-2 text-xs dark:border-neutral-800">
+        <div class="flex flex-wrap items-center gap-2 border-b border-rule px-3 py-1.5">
             <input
                 v-model="query"
                 type="search"
                 placeholder="Filter rows…"
-                class="w-48 rounded border border-neutral-300 bg-white px-2 py-1 text-neutral-800 placeholder:text-neutral-400 focus:border-emerald-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                class="nx-field w-44"
             />
-            <span class="text-neutral-500">
+            <span class="nx-cap tabular-nums">
                 {{ sorted.length }}<span v-if="query"> / {{ table.rows.length }}</span> rows
-                <span v-if="table.truncated" class="text-amber-500">(showing first {{ table.rows.length }} of {{ table.count }})</span>
             </span>
-            <div class="ml-auto flex items-center gap-1">
-                <button type="button" class="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="exportCsv">CSV</button>
-                <button type="button" class="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="exportJson">JSON</button>
+            <span v-if="table.truncated" class="nx-cap text-warn">
+                capped at {{ table.rows.length }} of {{ table.count }}
+            </span>
+            <div class="ml-auto flex items-center gap-1.5">
+                <span class="nx-cap">export</span>
+                <button type="button" class="nx-btn" @click="exportCsv">CSV</button>
+                <button type="button" class="nx-btn" @click="exportJson">JSON</button>
             </div>
         </div>
 
-        <!-- Grid -->
+        <!-- Grid: hairline rules, no fills. Header labels are chrome. -->
         <div class="min-h-0 flex-1 overflow-auto">
-            <table class="w-full border-collapse text-left font-mono text-xs">
-                <thead class="sticky top-0 z-10 bg-neutral-100 dark:bg-neutral-900">
+            <table class="w-full border-collapse text-left font-mono text-[11.5px]">
+                <thead class="sticky top-0 z-10 bg-raised">
                     <tr>
                         <th
                             v-for="(col, i) in table.columns"
                             :key="col"
-                            class="cursor-pointer select-none border-b border-neutral-200 px-3 py-1.5 font-semibold text-neutral-600 hover:text-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:text-white"
+                            class="cursor-pointer select-none border-b border-rule-2 px-3 py-2 hover:bg-accent-soft"
                             @click="toggleSort(i)"
                         >
-                            <span class="inline-flex items-center gap-1">
+                            <span class="nx-cap inline-flex items-center gap-1.5 hover:text-ink">
                                 {{ col }}
-                                <span v-if="sortCol === i" class="text-emerald-500">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+                                <span v-if="sortCol === i" class="text-[8px] text-accent">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
                             </span>
                         </th>
                     </tr>
@@ -143,27 +146,33 @@ function exportJson() {
                     <tr
                         v-for="(row, r) in paged"
                         :key="r"
-                        class="odd:bg-white even:bg-neutral-50 hover:bg-emerald-50 dark:odd:bg-neutral-950 dark:even:bg-neutral-900/50 dark:hover:bg-emerald-950/30"
+                        class="hover:bg-accent-soft"
                     >
-                        <td v-for="(cell, c) in row" :key="c" class="max-w-xs truncate border-b border-neutral-100 px-3 py-1 align-top dark:border-neutral-800/60">
-                            <span v-if="cell === null || cell === undefined" class="italic text-neutral-400">null</span>
-                            <span v-else-if="typeof cell === 'boolean'" class="text-purple-500 dark:text-purple-400">{{ cell }}</span>
-                            <span v-else-if="typeof cell === 'number'" class="text-amber-600 dark:text-amber-400">{{ cell }}</span>
-                            <span v-else class="text-neutral-800 dark:text-neutral-200" :title="String(cell)">{{ cell }}</span>
+                        <td
+                            v-for="(cell, c) in row"
+                            :key="c"
+                            class="max-w-xs truncate border-b border-rule px-3 py-1.5 align-top"
+                        >
+                            <span v-if="cell === null || cell === undefined" class="italic text-ink-3">null</span>
+                            <span v-else-if="typeof cell === 'boolean'" class="text-bool">{{ cell }}</span>
+                            <span v-else-if="typeof cell === 'number'" class="tabular-nums text-num">{{ cell }}</span>
+                            <span v-else class="text-ink" :title="String(cell)">{{ cell }}</span>
                         </td>
                     </tr>
                     <tr v-if="!paged.length">
-                        <td :colspan="table.columns.length" class="px-3 py-4 text-center text-neutral-400">No matching rows</td>
+                        <td :colspan="table.columns.length" class="px-3 py-8 text-center">
+                            <span class="nx-cap">No matching rows</span>
+                        </td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
         <!-- Pagination -->
-        <div v-if="pageCount > 1" class="flex items-center justify-center gap-3 border-t border-neutral-200 px-3 py-1.5 text-xs dark:border-neutral-800">
-            <button type="button" class="rounded px-2 py-0.5 disabled:opacity-40 hover:bg-neutral-100 dark:hover:bg-neutral-800" :disabled="page <= 1" @click="page--">‹ Prev</button>
-            <span class="text-neutral-500">Page {{ page }} / {{ pageCount }}</span>
-            <button type="button" class="rounded px-2 py-0.5 disabled:opacity-40 hover:bg-neutral-100 dark:hover:bg-neutral-800" :disabled="page >= pageCount" @click="page++">Next ›</button>
+        <div v-if="pageCount > 1" class="flex shrink-0 items-center justify-center gap-3 border-t border-rule px-3 py-1.5">
+            <button type="button" class="nx-btn" :disabled="page <= 1" @click="page--">‹ Prev</button>
+            <span class="nx-cap tabular-nums">{{ page }} / {{ pageCount }}</span>
+            <button type="button" class="nx-btn" :disabled="page >= pageCount" @click="page++">Next ›</button>
         </div>
     </div>
 </template>

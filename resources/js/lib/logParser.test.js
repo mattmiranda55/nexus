@@ -159,8 +159,8 @@ test('accumulator reset keeps the array identity callers hold', () => {
 });
 
 test('maps levels to distinct colors', () => {
-    expect(levelStyle('ERROR').text).toBe('text-red-500');
-    expect(levelStyle('warning').text).toBe('text-amber-500');
-    expect(levelStyle('info').text).toBe('text-emerald-500');
-    expect(levelStyle('debug').text).toBe('text-sky-500');
+    expect(levelStyle('ERROR').text).toBe('text-err');
+    expect(levelStyle('warning').text).toBe('text-warn');
+    expect(levelStyle('info').text).toBe('text-ok');
+    expect(levelStyle('debug').text).toBe('text-key');
 });

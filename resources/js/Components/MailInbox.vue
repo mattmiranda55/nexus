@@ -175,23 +175,25 @@ onBeforeUnmount(teardownLive);
 <template>
     <div class="flex h-full min-h-0 flex-col">
         <!-- Header -->
-        <div class="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-3 py-2 text-xs dark:border-neutral-800">
-            <span class="flex items-center gap-1.5">
+        <div class="flex shrink-0 flex-wrap items-center gap-2 border-b border-rule bg-paper px-3 py-1.5">
+            <span class="flex shrink-0 items-center gap-1.5">
                 <span
-                    class="h-2 w-2 rounded-full"
-                    :class="phase === 'ready' ? 'bg-emerald-500' : phase === 'starting' ? 'bg-amber-500 animate-pulse' : 'bg-neutral-400'"
+                    class="h-1.5 w-1.5"
+                    :class="phase === 'ready' ? 'bg-ok' : phase === 'starting' ? 'bg-accent nx-blink' : 'bg-ink-3'"
                 ></span>
-                Mailpit
-                <span v-if="state.source === 'detected'" class="text-neutral-400">(existing)</span>
+                <span class="nx-cap" :class="phase === 'ready' ? 'text-ok' : ''">Mailpit</span>
+                <span v-if="state.source === 'detected'" class="nx-cap">· existing</span>
             </span>
 
-            <span v-if="hasEnv && !connected" class="text-amber-500">· active project not wired to Mailpit</span>
+            <span v-if="hasEnv && !connected" class="nx-cap text-warn">· project not wired</span>
 
-            <div class="ml-auto flex items-center gap-1">
+            <span class="nx-leader"></span>
+
+            <div class="flex shrink-0 items-center gap-1.5">
                 <button
                     v-if="phase === 'ready' && hasEnv && !connected"
                     type="button"
-                    class="rounded bg-emerald-600 px-2 py-1 text-white hover:bg-emerald-500"
+                    class="nx-btn nx-btn-accent"
                     @click="connectEnv"
                 >
                     Connect this app
@@ -199,7 +201,7 @@ onBeforeUnmount(teardownLive);
                 <button
                     v-if="phase === 'ready'"
                     type="button"
-                    class="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                    class="nx-btn"
                     @click="loadMessages"
                 >
                     Refresh
@@ -207,7 +209,7 @@ onBeforeUnmount(teardownLive);
                 <button
                     v-if="phase === 'ready' && messages.length"
                     type="button"
-                    class="rounded border border-red-400 px-2 py-1 text-red-600 hover:bg-red-50 dark:border-red-500/60 dark:text-red-400 dark:hover:bg-red-950/40"
+                    class="nx-btn nx-btn-danger"
                     @click="clearInbox"
                 >
                     Clear
@@ -216,83 +218,112 @@ onBeforeUnmount(teardownLive);
         </div>
 
         <!-- States -->
-        <div v-if="!activeProject" class="flex flex-1 items-center justify-center text-sm text-neutral-400">
-            Select a project to view its mail.
+        <div v-if="!activeProject" class="flex flex-1 flex-col items-center justify-center gap-2.5 bg-surface">
+            <span class="nx-cap">No project</span>
+            <p class="text-[11px] text-ink-3">Select a project to view its mail.</p>
         </div>
-        <div v-else-if="phase === 'starting' || phase === 'init'" class="flex flex-1 items-center justify-center text-sm text-neutral-400">
-            {{ phase === 'starting' ? 'Starting Mailpit…' : 'Checking Mailpit…' }}
+        <div v-else-if="phase === 'starting' || phase === 'init'" class="flex flex-1 flex-col items-center justify-center gap-3 bg-surface">
+            <div class="nx-skeleton h-2.5 w-40"></div>
+            <span class="nx-cap">{{ phase === 'starting' ? 'Starting Mailpit' : 'Checking Mailpit' }}</span>
         </div>
-        <div v-else-if="phase === 'missing'" class="flex flex-1 items-center justify-center p-6">
-            <div class="max-w-md text-center text-sm text-neutral-500">
-                <p class="mb-2 font-medium text-neutral-700 dark:text-neutral-200">Mailpit isn't running and no binary was found.</p>
-                <p>Install <a class="text-sky-600 underline dark:text-sky-400" href="https://mailpit.axllent.org" target="_blank" rel="noopener">Mailpit</a>
-                (Herd bundles it), or set <code class="rounded bg-neutral-200 px-1 dark:bg-neutral-800">NEXUS_MAILPIT_PATH</code>,
-                then Refresh.</p>
-                <button type="button" class="mt-3 rounded bg-neutral-800 px-3 py-1.5 text-white dark:bg-neutral-700" @click="init">Retry</button>
+        <div v-else-if="phase === 'missing'" class="flex flex-1 items-center justify-center bg-surface p-6">
+            <div class="max-w-md border border-dashed border-rule-2 p-5 text-center">
+                <p class="nx-cap">Mailpit not found</p>
+                <p class="mt-3 text-[12px] leading-relaxed text-ink-2">
+                    Nothing is running and no binary was located. Install
+                    <a class="text-key underline decoration-dotted underline-offset-2" href="https://mailpit.axllent.org" target="_blank" rel="noopener">Mailpit</a>
+                    (Herd bundles it), or set
+                    <code class="border border-rule bg-raised px-1 font-mono text-[11px]">NEXUS_MAILPIT_PATH</code>,
+                    then retry.
+                </p>
+                <button type="button" class="nx-btn mt-4" @click="init">Retry</button>
             </div>
         </div>
-        <div v-else-if="phase === 'error'" class="flex flex-1 items-center justify-center p-6 text-center text-sm text-red-500">
-            Couldn't reach Mailpit. <button type="button" class="ml-1 underline" @click="init">Retry</button>
+        <div v-else-if="phase === 'error'" class="flex flex-1 flex-col items-center justify-center gap-3 bg-surface p-6 text-center">
+            <span class="nx-cap text-err">Unreachable</span>
+            <p class="text-[11px] text-ink-2">Couldn't reach Mailpit.</p>
+            <button type="button" class="nx-btn" @click="init">Retry</button>
         </div>
 
         <!-- Inbox -->
         <div v-else class="flex min-h-0 flex-1">
             <!-- List -->
-            <div class="w-72 shrink-0 overflow-auto border-r border-neutral-200 dark:border-neutral-800">
-                <div v-if="!messages.length" class="p-4 text-center text-xs text-neutral-400">Inbox empty. Send a mail from your app.</div>
-                <button
-                    v-for="msg in messages"
-                    :key="msg.ID"
-                    type="button"
-                    class="block w-full border-b border-neutral-100 px-3 py-2 text-left dark:border-neutral-900"
-                    :class="selectedId === msg.ID ? 'bg-emerald-50 dark:bg-emerald-950/40' : 'hover:bg-neutral-50 dark:hover:bg-neutral-900'"
-                    @click="select(msg.ID)"
-                >
-                    <div class="flex items-center gap-1.5">
-                        <span v-if="!msg.Read" class="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500"></span>
-                        <span class="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">{{ msg.Subject || '(no subject)' }}</span>
+            <div class="flex w-[17rem] shrink-0 flex-col border-r border-rule bg-paper">
+                <div class="flex shrink-0 items-center gap-2.5 border-b border-rule px-3 py-1.5">
+                    <span class="nx-cap">Inbox</span>
+                    <span class="nx-leader"></span>
+                    <span v-if="messages.length" class="nx-cap tabular-nums">{{ messages.length }}</span>
+                </div>
+
+                <div class="min-h-0 flex-1 overflow-auto">
+                    <div v-if="!messages.length" class="mx-3 mt-3 border border-dashed border-rule-2 px-3 py-6 text-center">
+                        <p class="nx-cap">Empty</p>
+                        <p class="mt-2 text-[11px] leading-snug text-ink-3">Send a mail from your app.</p>
                     </div>
-                    <div class="mt-0.5 truncate text-[11px] text-neutral-500">{{ fromLabel(msg) }}</div>
-                    <div class="truncate text-[11px] text-neutral-400">{{ msg.Snippet }}</div>
-                </button>
+
+                    <button
+                        v-for="msg in messages"
+                        :key="msg.ID"
+                        type="button"
+                        class="block w-full border-b border-rule px-3 py-2 text-left transition-colors"
+                        :class="selectedId === msg.ID ? 'nx-marked bg-raised' : 'hover:bg-raised/60'"
+                        @click="select(msg.ID)"
+                    >
+                        <div class="flex items-center gap-1.5">
+                            <span v-if="!msg.Read" class="h-1.5 w-1.5 shrink-0 bg-accent" title="Unread"></span>
+                            <span
+                                class="truncate text-[12.5px] leading-tight"
+                                :class="msg.Read ? 'text-ink-2' : 'font-medium text-ink'"
+                            >{{ msg.Subject || '(no subject)' }}</span>
+                        </div>
+                        <div class="mt-1 truncate font-mono text-[10px] text-ink-2">{{ fromLabel(msg) }}</div>
+                        <div class="mt-0.5 truncate text-[11px] leading-snug text-ink-3">{{ msg.Snippet }}</div>
+                    </button>
+                </div>
             </div>
 
             <!-- Detail -->
-            <div class="flex min-w-0 flex-1 flex-col">
-                <div v-if="!detail" class="flex flex-1 items-center justify-center text-sm text-neutral-400">Select a message.</div>
+            <div class="flex min-w-0 flex-1 flex-col bg-surface">
+                <div v-if="!detail" class="flex flex-1 flex-col items-center justify-center gap-2.5">
+                    <span class="h-2 w-2 rotate-45 border border-rule-2"></span>
+                    <span class="nx-cap">Select a message</span>
+                </div>
                 <template v-else>
-                    <div class="border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
-                        <div class="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{{ detail.Subject || '(no subject)' }}</div>
-                        <div class="mt-0.5 text-xs text-neutral-500">
-                            {{ detail.From?.Address }} →
+                    <div class="shrink-0 border-b border-rule bg-paper px-3 pt-2">
+                        <div class="truncate text-[13px] font-medium text-ink">{{ detail.Subject || '(no subject)' }}</div>
+                        <div class="mt-1 truncate font-mono text-[10.5px] text-ink-2">
+                            {{ detail.From?.Address }}
+                            <span class="text-accent">→</span>
                             {{ (detail.To || []).map((t) => t.Address).join(', ') }}
                         </div>
-                        <div class="mt-1 flex gap-1">
+                        <div class="mt-2 flex h-7 items-stretch gap-4">
                             <button
                                 v-for="t in bodyTabs"
                                 :key="t.key"
                                 type="button"
-                                class="rounded px-2 py-0.5 text-xs"
-                                :class="bodyTab === t.key ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : 'text-neutral-500'"
+                                class="nx-tab"
+                                :class="{ 'nx-tab-on': bodyTab === t.key }"
                                 @click="bodyTab = t.key"
                             >
                                 {{ t.label }}
                             </button>
-                            <span v-if="detail.Attachments?.length" class="ml-2 self-center text-[11px] text-neutral-400">
+                            <span class="nx-leader self-center"></span>
+                            <span v-if="detail.Attachments?.length" class="nx-cap self-center">
                                 📎 {{ detail.Attachments.length }}
                             </span>
                         </div>
                     </div>
 
                     <div class="min-h-0 flex-1 overflow-auto">
+                        <!-- Mail HTML keeps its own white canvas; it isn't ours to re-theme. -->
                         <iframe
                             v-if="bodyTab === 'html'"
                             :srcdoc="detail.HTML"
                             sandbox=""
                             class="h-full w-full border-0 bg-white"
                         ></iframe>
-                        <pre v-else-if="bodyTab === 'text'" class="whitespace-pre-wrap break-words p-3 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ detail.Text || '(no text part)' }}</pre>
-                        <pre v-else class="whitespace-pre-wrap break-words p-3 font-mono text-xs text-neutral-500">{{ sourceText ?? 'Loading…' }}</pre>
+                        <pre v-else-if="bodyTab === 'text'" class="whitespace-pre-wrap break-words p-3 font-mono text-[11.5px] leading-relaxed text-ink">{{ detail.Text || '(no text part)' }}</pre>
+                        <pre v-else class="whitespace-pre-wrap break-words p-3 font-mono text-[10.5px] leading-relaxed text-ink-2">{{ sourceText ?? 'Loading…' }}</pre>
                     </div>
                 </template>
             </div>

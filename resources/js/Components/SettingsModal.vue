@@ -38,38 +38,36 @@ function save() {
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="emit('close')">
-        <div class="w-96 rounded-lg border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
-            <h2 class="text-base font-semibold">Settings</h2>
+    <div class="nx-scrim nx-fade fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="emit('close')">
+        <div class="nx-plate nx-rise w-[25rem] max-w-full">
+            <div class="flex items-center gap-3 border-b border-rule bg-paper px-4 py-2.5">
+                <span class="h-2 w-2 shrink-0 rotate-45 bg-accent"></span>
+                <h2 class="font-display text-[15px] text-ink">Settings</h2>
+                <span class="nx-leader"></span>
+            </div>
 
-            <div class="mt-4 space-y-4">
+            <div class="space-y-4 p-4">
                 <div>
-                    <label class="block text-xs font-medium text-neutral-500">Theme</label>
-                    <select
-                        v-model="form.theme"
-                        class="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-neutral-700"
-                    >
+                    <label class="nx-cap mb-1.5 block">Theme</label>
+                    <select v-model="form.theme" class="nx-field w-full">
                         <option value="dark">Dark</option>
                         <option value="light">Light</option>
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-neutral-500">PHP binary path (optional)</label>
+                    <label class="nx-cap mb-1.5 block">PHP binary path <span class="text-ink-3">· optional</span></label>
                     <input
                         v-model="form.phpPath"
                         type="text"
-                        placeholder="Leave blank to auto-detect (Herd / PATH)"
-                        class="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 font-mono text-xs dark:border-neutral-700"
+                        placeholder="Auto-detect (Herd / PATH)"
+                        class="nx-field nx-field-mono w-full"
                     />
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-neutral-500">Editor (click-to-source)</label>
-                    <select
-                        v-model="form.editor"
-                        class="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-neutral-700"
-                    >
+                    <label class="nx-cap mb-1.5 block">Editor · click-to-source</label>
+                    <select v-model="form.editor" class="nx-field w-full">
                         <option value="phpstorm">PhpStorm</option>
                         <option value="vscode">VS Code</option>
                         <option value="vscodium">VSCodium</option>
@@ -80,46 +78,39 @@ function save() {
                 </div>
 
                 <div v-if="isWindows">
-                    <label class="block text-xs font-medium text-neutral-500">Log streaming shell</label>
-                    <select
-                        v-model="form.logShell"
-                        class="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-neutral-700"
-                    >
+                    <label class="nx-cap mb-1.5 block">Log streaming shell</label>
+                    <select v-model="form.logShell" class="nx-field w-full">
                         <option value="gitbash">Git Bash — recommended</option>
                         <option value="wsl">WSL</option>
                         <option value="powershell">PowerShell — not recommended</option>
                     </select>
                     <p
-                        class="mt-1 text-[11px] leading-snug"
+                        class="mt-2 border-l-2 pl-2.5 text-[11px] leading-snug"
                         :class="form.logShell === 'powershell'
-                            ? 'text-amber-600 dark:text-amber-500'
-                            : 'text-neutral-500'"
+                            ? 'border-warn text-warn'
+                            : 'border-rule-2 text-ink-3'"
                     >
                         {{ shellNote }}
                     </p>
                 </div>
 
-                <label class="flex items-center gap-2 text-sm">
-                    <input v-model="form.notifyErrors" type="checkbox" class="rounded border-neutral-300 dark:border-neutral-700" />
+                <label class="flex cursor-pointer items-center gap-2.5 border-t border-rule pt-4 text-[12.5px] text-ink-2">
+                    <input v-model="form.notifyErrors" type="checkbox" class="nx-check" />
                     <span>Desktop notification on log errors</span>
                 </label>
             </div>
 
-            <div class="mt-6 flex justify-end gap-2">
-                <button
-                    type="button"
-                    class="rounded px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                    @click="emit('close')"
-                >
+            <div class="flex justify-end gap-2 border-t border-rule bg-paper px-4 py-3">
+                <button type="button" class="nx-btn" @click="emit('close')">
                     Cancel
                 </button>
                 <button
                     type="button"
-                    class="rounded bg-neutral-800 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-700 dark:hover:bg-neutral-600"
+                    class="nx-btn nx-btn-accent px-4"
                     :disabled="form.processing"
                     @click="save"
                 >
-                    Save
+                    {{ form.processing ? 'Saving' : 'Save' }}
                 </button>
             </div>
         </div>

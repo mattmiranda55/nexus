@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+{{-- The inline background matches --nx-paper (dark) so the window never flashes
+     white in the moment before the stylesheet lands. --}}
+<html lang="en" class="dark" style="background-color: #14110e">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

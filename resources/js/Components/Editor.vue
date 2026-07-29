@@ -4,7 +4,7 @@ import { EditorView, basicSetup } from 'codemirror';
 import { Compartment, EditorState } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { php } from '@codemirror/lang-php';
-import { oneDark } from '@codemirror/theme-one-dark';
+import { nexusEditorTheme } from '../lib/editorTheme.js';
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
@@ -18,8 +18,9 @@ let view = null;
 const themeCompartment = new Compartment();
 
 function themeExtension(dark) {
-    // oneDark for dark mode; CodeMirror's default (light) otherwise.
-    return dark ? oneDark : [];
+    // Both variants are the Nexus palette; the flag only tells CodeMirror which
+    // way its own contrast heuristics should lean.
+    return nexusEditorTheme(dark);
 }
 
 onMounted(() => {
@@ -76,5 +77,5 @@ watch(
 </script>
 
 <template>
-    <div ref="host" class="h-full w-full overflow-auto text-sm"></div>
+    <div ref="host" class="h-full w-full overflow-auto bg-surface text-sm"></div>
 </template>

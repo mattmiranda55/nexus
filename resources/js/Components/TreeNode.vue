@@ -32,23 +32,23 @@ const summary = computed(() => {
         <template v-if="isContainer">
             <button
                 type="button"
-                class="group flex w-full items-center gap-1 rounded px-1 text-left hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                class="group flex w-full items-center gap-1.5 px-1 text-left hover:bg-accent-soft"
                 @click="open = !open"
             >
                 <svg
-                    class="h-3 w-3 shrink-0 text-neutral-400 transition-transform"
+                    class="h-2.5 w-2.5 shrink-0 text-ink-3 transition-transform duration-150 group-hover:text-accent"
                     :class="open ? 'rotate-90' : ''"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                 >
                     <path d="M7 5l6 5-6 5V5z" />
                 </svg>
-                <span v-if="nodeKey !== null" class="text-sky-500 dark:text-sky-400">{{ nodeKey }}:</span>
-                <span class="text-neutral-500">{{ summary }}</span>
+                <span v-if="nodeKey !== null" class="text-key">{{ nodeKey }}:</span>
+                <span class="text-ink-2">{{ summary }}</span>
             </button>
 
-            <div v-if="open" class="ml-3 border-l border-neutral-200 pl-2 dark:border-neutral-800">
-                <div v-if="!node.entries?.length" class="px-1 text-neutral-400">empty</div>
+            <div v-if="open" class="ml-2.5 border-l border-rule pl-2.5">
+                <div v-if="!node.entries?.length" class="nx-cap px-1 py-0.5">empty</div>
                 <TreeNode
                     v-for="(entry, i) in node.entries"
                     :key="i"
@@ -56,24 +56,24 @@ const summary = computed(() => {
                     :node="entry.node"
                     :depth="depth + 1"
                 />
-                <div v-if="node.truncated" class="px-1 text-neutral-400">
+                <div v-if="node.truncated" class="nx-cap px-1 py-0.5">
                     … more entries hidden (capped)
                 </div>
             </div>
         </template>
 
         <!-- Leaf row -->
-        <div v-else class="flex items-baseline gap-1 px-1">
-            <span v-if="nodeKey !== null" class="shrink-0 text-sky-500 dark:text-sky-400">{{ nodeKey }}:</span>
+        <div v-else class="flex items-baseline gap-1.5 px-1">
+            <span v-if="nodeKey !== null" class="shrink-0 text-key">{{ nodeKey }}:</span>
 
-            <span v-if="node.kind === 'null'" class="italic text-neutral-400">null</span>
-            <span v-else-if="node.kind === 'bool'" class="text-purple-500 dark:text-purple-400">{{ node.value ? 'true' : 'false' }}</span>
-            <span v-else-if="node.kind === 'number'" class="text-amber-600 dark:text-amber-400">{{ node.value }}</span>
-            <span v-else-if="node.kind === 'string'" class="break-all text-emerald-600 dark:text-emerald-400">
-                "{{ node.value }}"<span v-if="node.truncated" class="text-neutral-400"> … ({{ node.length }} chars)</span>
+            <span v-if="node.kind === 'null'" class="italic text-ink-3">null</span>
+            <span v-else-if="node.kind === 'bool'" class="text-bool">{{ node.value ? 'true' : 'false' }}</span>
+            <span v-else-if="node.kind === 'number'" class="tabular-nums text-num">{{ node.value }}</span>
+            <span v-else-if="node.kind === 'string'" class="break-all text-str">
+                "{{ node.value }}"<span v-if="node.truncated" class="text-ink-3"> … ({{ node.length }} chars)</span>
             </span>
-            <span v-else-if="node.collapsed" class="text-neutral-400">{{ node.preview }} <span class="italic">(too deep)</span></span>
-            <span v-else class="text-neutral-500">{{ node.preview ?? node.kind }}</span>
+            <span v-else-if="node.collapsed" class="text-ink-3">{{ node.preview }} <span class="italic">(too deep)</span></span>
+            <span v-else class="text-ink-2">{{ node.preview ?? node.kind }}</span>
         </div>
     </div>
 </template>

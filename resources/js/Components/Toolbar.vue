@@ -14,81 +14,83 @@ defineEmits(['run', 'update:activeTab', 'update:layout', 'history']);
 // CodeMirror binds Mod-Enter, which is ⌘ on macOS and Ctrl everywhere else —
 // so the hint has to follow suit rather than always showing the Mac glyph.
 const runKey = computed(() => (props.platform === 'Darwin' ? '⌘↵' : 'Ctrl+↵'));
+
+const TABS = [
+    { key: 'tinker', label: 'Tinker' },
+    { key: 'logs', label: 'Logs' },
+    { key: 'mail', label: 'Mail' },
+];
 </script>
 
 <template>
-    <div class="flex items-center gap-3 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
-        <button
-            type="button"
-            class="flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
-            :disabled="running || !hasProject"
-            :title="hasProject ? `Run (${runKey})` : 'Select a project first'"
-            @click="$emit('run')"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5">
-                <path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.34-5.89a1.5 1.5 0 0 0 0-2.54L6.3 2.84Z" />
-            </svg>
-            {{ running ? 'Running…' : 'Run' }}
-        </button>
+    <div class="relative flex h-11 shrink-0 items-stretch gap-6 border-b border-rule bg-paper px-3">
+        <!-- Sections: underlined mono labels, no pills -->
+        <nav class="flex items-stretch gap-5">
+            <button
+                v-for="tab in TABS"
+                :key="tab.key"
+                type="button"
+                class="nx-tab"
+                :class="{ 'nx-tab-on': activeTab === tab.key }"
+                @click="$emit('update:activeTab', tab.key)"
+            >
+                {{ tab.label }}
+            </button>
+        </nav>
 
-        <div class="flex rounded-md bg-neutral-100 p-0.5 text-sm dark:bg-neutral-800">
+        <span class="nx-leader self-center"></span>
+
+        <div class="flex items-center gap-1.5">
             <button
+                v-if="activeTab === 'tinker'"
                 type="button"
-                class="rounded px-3 py-1"
-                :class="activeTab === 'tinker' ? 'bg-white shadow-sm dark:bg-neutral-700' : 'text-neutral-500'"
-                @click="$emit('update:activeTab', 'tinker')"
+                class="nx-icon-btn"
+                :disabled="!hasProject"
+                title="Run history"
+                @click="$emit('history')"
             >
-                Tinker
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
+                </svg>
             </button>
+
             <button
+                v-if="activeTab === 'tinker'"
                 type="button"
-                class="rounded px-3 py-1"
-                :class="activeTab === 'logs' ? 'bg-white shadow-sm dark:bg-neutral-700' : 'text-neutral-500'"
-                @click="$emit('update:activeTab', 'logs')"
+                class="nx-icon-btn"
+                :title="layout === 'vertical' ? 'Switch to side-by-side' : 'Switch to stacked'"
+                @click="$emit('update:layout', layout === 'vertical' ? 'horizontal' : 'vertical')"
             >
-                Logs
+                <svg v-if="layout === 'vertical'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                    <path d="M3 4.5A1.5 1.5 0 0 1 4.5 3h4A1.5 1.5 0 0 1 10 4.5v11A1.5 1.5 0 0 1 8.5 17h-4A1.5 1.5 0 0 1 3 15.5v-11ZM11.5 3A1.5 1.5 0 0 0 10 4.5v11A1.5 1.5 0 0 0 11.5 17h4a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 15.5 3h-4Z" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                    <path d="M3 4.5A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5v4A1.5 1.5 0 0 1 15.5 10h-11A1.5 1.5 0 0 1 3 8.5v-4ZM4.5 11A1.5 1.5 0 0 0 3 12.5v3A1.5 1.5 0 0 0 4.5 17h11a1.5 1.5 0 0 0 1.5-1.5v-3a1.5 1.5 0 0 0-1.5-1.5h-11Z" />
+                </svg>
             </button>
+
+            <kbd class="nx-kbd ml-1 hidden sm:inline-block">{{ runKey }}</kbd>
+
+            <!-- The only solid accent surface in the app -->
             <button
                 type="button"
-                class="rounded px-3 py-1"
-                :class="activeTab === 'mail' ? 'bg-white shadow-sm dark:bg-neutral-700' : 'text-neutral-500'"
-                @click="$emit('update:activeTab', 'mail')"
+                class="nx-btn nx-btn-accent ml-1 px-3"
+                :disabled="running || !hasProject"
+                :title="hasProject ? `Run (${runKey})` : 'Select a project first'"
+                @click="$emit('run')"
             >
-                Mail
+                <span
+                    v-if="running"
+                    class="nx-blink h-1.5 w-1.5 shrink-0 bg-current"
+                ></span>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
+                    <path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.34-5.89a1.5 1.5 0 0 0 0-2.54L6.3 2.84Z" />
+                </svg>
+                {{ running ? 'Running' : 'Run' }}
             </button>
         </div>
 
-        <button
-            v-if="activeTab === 'tinker'"
-            type="button"
-            class="ml-auto rounded p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-            :disabled="!hasProject"
-            title="Run history"
-            @click="$emit('history')"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
-            </svg>
-        </button>
-
-        <button
-            v-if="activeTab === 'tinker'"
-            type="button"
-            class="rounded p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-            :title="layout === 'vertical' ? 'Switch to side-by-side' : 'Switch to stacked'"
-            @click="$emit('update:layout', layout === 'vertical' ? 'horizontal' : 'vertical')"
-        >
-            <svg v-if="layout === 'vertical'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
-                <path d="M3 4.5A1.5 1.5 0 0 1 4.5 3h4A1.5 1.5 0 0 1 10 4.5v11A1.5 1.5 0 0 1 8.5 17h-4A1.5 1.5 0 0 1 3 15.5v-11ZM11.5 3A1.5 1.5 0 0 0 10 4.5v11A1.5 1.5 0 0 0 11.5 17h4a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 15.5 3h-4Z" />
-            </svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
-                <path d="M3 4.5A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5v4A1.5 1.5 0 0 1 15.5 10h-11A1.5 1.5 0 0 1 3 8.5v-4ZM4.5 11A1.5 1.5 0 0 0 3 12.5v3A1.5 1.5 0 0 0 4.5 17h11a1.5 1.5 0 0 0 1.5-1.5v-3a1.5 1.5 0 0 0-1.5-1.5h-11Z" />
-            </svg>
-        </button>
-
-        <span
-            class="text-xs text-neutral-400"
-            :class="activeTab === 'tinker' ? '' : 'ml-auto'"
-        >{{ runKey }} to run</span>
+        <!-- Indeterminate progress, riding the bar's bottom rule -->
+        <div v-if="running" class="nx-sweep absolute inset-x-0 -bottom-px h-[2px]"></div>
     </div>
 </template>

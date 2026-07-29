@@ -41,36 +41,50 @@ const suspects = computed(() =>
 </script>
 
 <template>
-    <div class="h-full overflow-auto p-3 font-mono text-xs">
-        <div class="mb-2 flex items-center gap-3 text-neutral-500">
-            <span>{{ queries.length }} quer{{ queries.length === 1 ? 'y' : 'ies' }}</span>
-            <span>· {{ totalTime }} ms total</span>
+    <div class="h-full overflow-auto">
+        <!-- Tally strip -->
+        <div class="flex items-center gap-2.5 border-b border-rule px-3 py-1.5">
+            <span class="nx-cap tabular-nums">{{ queries.length }} quer{{ queries.length === 1 ? 'y' : 'ies' }}</span>
+            <span class="nx-leader"></span>
+            <span class="nx-cap tabular-nums text-num">{{ totalTime }} ms</span>
         </div>
 
-        <div v-if="suspects.length" class="mb-3 rounded border border-amber-400/50 bg-amber-50 p-2 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-            <div class="mb-1 font-semibold">⚠ Possible N+1 ({{ suspects.length }})</div>
-            <div v-for="s in suspects" :key="s.shape" class="truncate" :title="s.shape">
-                ×{{ s.n }} — {{ s.shape }}
+        <div v-if="suspects.length" class="border-b border-warn/40 bg-warn-soft px-3 py-2">
+            <div class="flex items-center gap-2">
+                <span class="text-warn">⚠</span>
+                <span class="nx-cap text-warn">Possible N+1 · {{ suspects.length }}</span>
+            </div>
+            <div
+                v-for="s in suspects"
+                :key="s.shape"
+                class="mt-1 truncate font-mono text-[11px] text-ink-2"
+                :title="s.shape"
+            >
+                <span class="text-warn">×{{ s.n }}</span> {{ s.shape }}
             </div>
         </div>
 
-        <ol class="space-y-1">
+        <ol>
             <li
                 v-for="(q, i) in queries"
                 :key="i"
-                class="rounded border border-neutral-200 p-2 dark:border-neutral-800"
+                class="border-b border-rule px-3 py-2 last:border-0 hover:bg-raised/60"
             >
-                <div class="flex items-start gap-2">
-                    <span class="shrink-0 text-neutral-400">{{ i + 1 }}.</span>
-                    <code class="flex-1 whitespace-pre-wrap break-words text-neutral-800 dark:text-neutral-200">{{ q.sql }}</code>
+                <div class="flex items-start gap-2.5 font-mono text-[11.5px]">
+                    <span class="w-5 shrink-0 text-right tabular-nums text-accent">{{ i + 1 }}</span>
+                    <code class="flex-1 whitespace-pre-wrap break-words leading-relaxed text-ink">{{ q.sql }}</code>
                     <span
                         v-if="shapeCounts[normalize(q.sql)] > N1_THRESHOLD"
-                        class="shrink-0 rounded bg-amber-200 px-1 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                        class="shrink-0 border border-warn/50 px-1 text-[10px] text-warn"
+                        title="Same query shape repeated"
                     >×{{ shapeCounts[normalize(q.sql)] }}</span>
-                    <span v-if="q.time !== null && q.time !== undefined" class="shrink-0 text-neutral-400">{{ q.time }}ms</span>
+                    <span
+                        v-if="q.time !== null && q.time !== undefined"
+                        class="shrink-0 tabular-nums text-[10px] text-ink-3"
+                    >{{ q.time }}ms</span>
                 </div>
-                <div v-if="q.bindings?.length" class="ml-5 mt-1 text-neutral-500">
-                    bindings: [{{ q.bindings.join(', ') }}]
+                <div v-if="q.bindings?.length" class="ml-[1.9rem] mt-1 font-mono text-[10.5px] text-ink-3">
+                    <span class="nx-cap">bind</span> [{{ q.bindings.join(', ') }}]
                 </div>
             </li>
         </ol>

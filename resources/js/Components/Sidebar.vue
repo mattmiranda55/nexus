@@ -49,12 +49,14 @@ function removeProject() {
 </script>
 
 <template>
-    <aside class="flex w-60 shrink-0 flex-col border-r border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-        <div class="flex items-center justify-between px-3 py-3">
-            <span class="text-sm font-semibold tracking-tight">Nexus</span>
+    <aside class="flex w-[15rem] shrink-0 flex-col border-r border-rule bg-paper">
+        <!-- Wordmark plate -->
+        <div class="flex h-11 shrink-0 items-center gap-2.5 border-b border-rule px-3">
+            <span class="h-2.5 w-2.5 shrink-0 rotate-45 bg-accent"></span>
+            <span class="nx-wordmark flex-1">Nexus</span>
             <button
                 type="button"
-                class="rounded p-1 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                class="nx-icon-btn"
                 title="Settings"
                 @click="$emit('open-settings')"
             >
@@ -64,35 +66,47 @@ function removeProject() {
             </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto px-2">
-            <ul v-if="projects.length" class="space-y-0.5">
+        <!-- Section caption, ruled like a drawing legend -->
+        <div class="flex shrink-0 items-center gap-2.5 px-3 pb-1.5 pt-3">
+            <span class="nx-cap">Projects</span>
+            <span class="nx-leader"></span>
+            <span v-if="projects.length" class="nx-cap tabular-nums">{{ projects.length }}</span>
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-y-auto">
+            <ul v-if="projects.length">
                 <li v-for="project in projects" :key="project.id">
                     <button
                         type="button"
-                        class="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-neutral-200 dark:hover:bg-neutral-800"
+                        class="block w-full px-3 py-2 text-left transition-colors"
                         :class="project.id === activeProjectId
-                            ? 'bg-neutral-200 font-medium dark:bg-neutral-800'
-                            : 'text-neutral-700 dark:text-neutral-300'"
+                            ? 'nx-marked bg-raised'
+                            : 'hover:bg-raised/60'"
+                        :title="project.path"
                         @click="activate(project)"
                         @contextmenu.prevent="openMenu($event, project)"
                     >
-                        <span class="block truncate">{{ project.name }}</span>
-                        <span class="block truncate font-mono text-[10px] text-neutral-400">{{ project.path }}</span>
+                        <span
+                            class="block truncate text-[12.5px] leading-tight"
+                            :class="project.id === activeProjectId ? 'font-medium text-ink' : 'text-ink-2'"
+                        >{{ project.name }}</span>
+                        <span class="mt-0.5 block truncate font-mono text-[10px] leading-tight text-ink-3">{{ project.path }}</span>
                     </button>
                 </li>
             </ul>
-            <p v-else class="px-2 py-4 text-center text-xs text-neutral-500">
-                No projects yet.
-            </p>
+
+            <div v-else class="mx-3 mt-1 border border-dashed border-rule-2 px-3 py-6 text-center">
+                <p class="nx-cap">No projects</p>
+                <p class="mt-2 text-[11px] leading-snug text-ink-3">
+                    Add a Laravel directory to start a session.
+                </p>
+            </div>
         </div>
 
-        <div class="p-2">
-            <button
-                type="button"
-                class="w-full rounded bg-neutral-800 px-2 py-1.5 text-sm text-white hover:bg-neutral-700 dark:bg-neutral-700 dark:hover:bg-neutral-600"
-                @click="addProject"
-            >
-                + Add Laravel project
+        <div class="shrink-0 border-t border-rule p-2">
+            <button type="button" class="nx-btn w-full" @click="addProject">
+                <span class="text-[13px] leading-none">+</span>
+                Add project
             </button>
         </div>
     </aside>
@@ -101,13 +115,22 @@ function removeProject() {
     <template v-if="menu.open">
         <div class="fixed inset-0 z-40" @click="closeMenu" @contextmenu.prevent="closeMenu"></div>
         <div
-            class="fixed z-50 min-w-40 rounded-md border border-neutral-200 bg-white py-1 text-sm shadow-lg dark:border-neutral-700 dark:bg-neutral-800"
+            class="nx-plate nx-fade fixed z-50 min-w-44 py-1"
             :style="{ top: menu.y + 'px', left: menu.x + 'px' }"
         >
-            <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700" @click="copyPath">
+            <div class="nx-cap truncate px-3 pb-1.5 pt-1">{{ menu.project?.name }}</div>
+            <button
+                type="button"
+                class="block w-full px-3 py-1.5 text-left text-xs text-ink-2 hover:bg-raised hover:text-ink"
+                @click="copyPath"
+            >
                 Copy path
             </button>
-            <button type="button" class="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-neutral-100 dark:text-red-400 dark:hover:bg-neutral-700" @click="removeProject">
+            <button
+                type="button"
+                class="block w-full px-3 py-1.5 text-left text-xs text-err hover:bg-err-soft"
+                @click="removeProject"
+            >
                 Remove project
             </button>
         </div>

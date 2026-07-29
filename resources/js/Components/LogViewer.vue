@@ -79,11 +79,11 @@ const visibleRows = computed(() =>
 const hiddenRows = computed(() => rows.value.length - visibleRows.value.length);
 
 const statusMeta = computed(() => ({
-    idle: { dot: 'bg-neutral-400', label: 'Idle' },
-    connecting: { dot: 'bg-amber-500 animate-pulse', label: 'Connecting…' },
-    live: { dot: 'bg-emerald-500', label: 'Live' },
-    missing: { dot: 'bg-neutral-400', label: 'No log file' },
-    error: { dot: 'bg-red-500', label: 'Unavailable' },
+    idle: { dot: 'bg-ink-3', text: 'text-ink-3', label: 'Idle' },
+    connecting: { dot: 'bg-accent nx-blink', text: 'text-accent', label: 'Connecting' },
+    live: { dot: 'bg-ok', text: 'text-ok', label: 'Live' },
+    missing: { dot: 'bg-ink-3', text: 'text-ink-3', label: 'No log file' },
+    error: { dot: 'bg-err', text: 'text-err', label: 'Unavailable' },
 }[status.value]));
 
 // Parsing happens per chunk (cheap, each line is touched once); re-rendering is
@@ -219,19 +219,19 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="flex h-full flex-col">
+    <div class="flex h-full min-h-0 flex-col">
         <!-- Controls -->
-        <div class="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
-            <span class="flex items-center gap-1.5 text-xs">
-                <span class="h-2 w-2 rounded-full" :class="statusMeta.dot"></span>
-                {{ statusMeta.label }}
+        <div class="flex shrink-0 flex-wrap items-center gap-2 border-b border-rule bg-paper px-3 py-1.5">
+            <span class="flex shrink-0 items-center gap-1.5">
+                <span class="h-1.5 w-1.5" :class="statusMeta.dot"></span>
+                <span class="nx-cap" :class="statusMeta.text">{{ statusMeta.label }}</span>
             </span>
 
             <input
                 v-model="search"
                 type="text"
                 placeholder="Filter logs…"
-                class="min-w-40 flex-1 rounded border border-neutral-300 bg-transparent px-2 py-1 text-xs dark:border-neutral-700"
+                class="nx-field min-w-36 flex-1"
             />
 
             <div class="flex flex-wrap gap-1">
@@ -239,23 +239,19 @@ onBeforeUnmount(() => {
                     v-for="level in presentLevels"
                     :key="level"
                     type="button"
-                    class="rounded px-1.5 py-0.5 text-[10px] uppercase"
+                    class="border px-1.5 py-1 font-mono text-[9.5px] uppercase leading-none tracking-[0.12em] transition-colors"
                     :class="activeLevels.has(level)
-                        ? levelStyle(level).text + ' ring-1 ring-current'
-                        : 'text-neutral-400'"
+                        ? levelStyle(level).text + ' border-current bg-raised'
+                        : 'border-rule text-ink-3 hover:border-rule-2 hover:text-ink-2'"
                     @click="toggleLevel(level)"
                 >
                     {{ level }}
                 </button>
             </div>
 
-            <span class="text-[10px] text-neutral-400">{{ rows.length }} entries</span>
+            <span class="nx-cap shrink-0 tabular-nums">{{ rows.length }} entries</span>
 
-            <button
-                type="button"
-                class="rounded px-2 py-0.5 text-xs text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                @click="clear"
-            >
+            <button type="button" class="nx-btn nx-btn-danger shrink-0" @click="clear">
                 Clear
             </button>
         </div>
@@ -263,86 +259,83 @@ onBeforeUnmount(() => {
         <!-- Stream -->
         <div
             ref="containerEl"
-            class="min-h-0 flex-1 overflow-auto bg-neutral-50 p-2 font-mono text-xs dark:bg-neutral-950"
+            class="min-h-0 flex-1 overflow-auto bg-surface font-mono text-[11.5px]"
             @scroll.passive="onScroll"
         >
-            <div v-if="!rows.length" class="p-4 text-center text-neutral-400">
+            <div v-if="!rows.length" class="flex flex-col items-center justify-center gap-2.5 px-6 py-12 text-center">
                 <template v-if="!activeProject">
-                    Select a project to stream its logs.
+                    <span class="nx-cap">No project</span>
+                    <p class="font-sans text-[11px] text-ink-3">Select a project to stream its logs.</p>
                 </template>
 
                 <template v-else-if="status === 'missing'">
-                    <p class="text-neutral-500 dark:text-neutral-400">No log file found.</p>
-                    <p class="mt-1 break-all text-[11px]">{{ logPath }}</p>
-                    <p class="mt-1 text-[11px]">
-                        Laravel creates it on the first log write.
-                    </p>
-                    <button
-                        type="button"
-                        class="mt-3 rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-                        @click="start"
-                    >
-                        Retry
-                    </button>
+                    <span class="nx-cap">No log file</span>
+                    <p class="max-w-lg break-all text-[10.5px] text-ink-2">{{ logPath }}</p>
+                    <p class="font-sans text-[11px] text-ink-3">Laravel creates it on the first log write.</p>
+                    <button type="button" class="nx-btn mt-1" @click="start">Retry</button>
                 </template>
 
                 <template v-else-if="status === 'error'">
-                    <p class="text-red-500">{{ errorMessage }}</p>
-                    <button
-                        type="button"
-                        class="mt-3 rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-                        @click="start"
-                    >
-                        Retry
-                    </button>
+                    <span class="nx-cap text-err">Unavailable</span>
+                    <p class="max-w-lg font-sans text-[11px] leading-snug text-ink-2">{{ errorMessage }}</p>
+                    <button type="button" class="nx-btn mt-1" @click="start">Retry</button>
                 </template>
 
                 <template v-else-if="status === 'connecting'">
-                    Connecting…
+                    <div class="nx-skeleton h-2.5 w-40"></div>
+                    <span class="nx-cap">Connecting</span>
                 </template>
 
                 <template v-else>
-                    Tailing {{ logPath }} — no output yet.
+                    <span class="nx-cap text-ok">Tailing</span>
+                    <p class="max-w-lg break-all text-[10.5px] text-ink-2">{{ logPath }}</p>
+                    <p class="font-sans text-[11px] text-ink-3">No output yet.</p>
                 </template>
             </div>
 
-            <p v-if="hiddenRows" class="pb-2 text-center text-[10px] text-neutral-400">
+            <p v-if="hiddenRows" class="nx-cap border-b border-rule bg-raised px-3 py-1.5 text-center">
                 {{ hiddenRows }} older {{ hiddenRows === 1 ? 'entry' : 'entries' }} hidden — filter to narrow the view
             </p>
 
             <div
                 v-for="row in visibleRows"
                 :key="row.key"
-                class="border-b border-neutral-100 py-1 last:border-0 dark:border-neutral-900"
+                class="border-b border-rule last:border-0"
             >
                 <div
-                    class="flex cursor-pointer items-start gap-2"
+                    class="flex cursor-pointer items-start gap-2.5 px-3 py-1.5 hover:bg-raised/70"
                     @click="row.entry.details.length && toggleEntry(row.key)"
                 >
-                    <span class="mt-1 h-2 w-2 shrink-0 rounded-full" :class="levelStyle(row.entry.level).dot"></span>
-                    <span v-if="row.entry.timestamp" class="shrink-0 text-neutral-400">{{ row.entry.timestamp }}</span>
-                    <span class="shrink-0 font-semibold" :class="levelStyle(row.entry.level).text">
-                        {{ (row.entry.originalLevel || row.entry.level).toUpperCase() }}
-                    </span>
-                    <span class="break-words text-neutral-800 dark:text-neutral-200">{{ row.entry.message }}</span>
+                    <!-- Level bar in the gutter, not a dot: reads as a margin mark -->
+                    <span class="mt-1 h-2.5 w-[3px] shrink-0" :class="levelStyle(row.entry.level).dot"></span>
+                    <span v-if="row.entry.timestamp" class="shrink-0 tabular-nums text-ink-3">{{ row.entry.timestamp }}</span>
+                    <span
+                        class="w-[4.5rem] shrink-0 text-[10px] uppercase tracking-[0.1em]"
+                        :class="levelStyle(row.entry.level).text"
+                    >{{ (row.entry.originalLevel || row.entry.level).toUpperCase() }}</span>
+                    <span class="break-words leading-relaxed text-ink">{{ row.entry.message }}</span>
                     <span
                         v-if="row.count > 1"
-                        class="shrink-0 rounded bg-neutral-200 px-1.5 text-[10px] font-semibold text-neutral-600 dark:bg-neutral-700 dark:text-neutral-200"
+                        class="shrink-0 border border-rule-2 px-1 text-[10px] tabular-nums text-ink-2"
                         title="Repeated consecutively"
                     >×{{ row.count }}</span>
-                    <span v-if="row.entry.details.length" class="ml-auto shrink-0 text-neutral-400">
+                    <span v-if="row.entry.details.length" class="ml-auto shrink-0 text-[9px] text-ink-3">
                         {{ expanded.has(row.key) ? '▾' : '▸' }}
                     </span>
                 </div>
 
-                <div v-if="row.entry.details.length && expanded.has(row.key)" class="mt-1 pl-4">
+                <div
+                    v-if="row.entry.details.length && expanded.has(row.key)"
+                    class="nx-fade ml-3 border-l border-rule-2 bg-paper py-2 pl-3 pr-3"
+                >
                     <!-- A3: jump-to-source shortcuts for each stack frame -->
-                    <div v-if="row.entry.stack.length" class="mb-1 flex flex-wrap gap-1">
+                    <div v-if="row.entry.stack.length" class="mb-2 flex flex-wrap items-center gap-1">
+                        <span class="nx-cap mr-1">frames</span>
                         <button
                             v-for="(frame, fi) in row.entry.stack"
                             :key="fi"
                             type="button"
-                            class="rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] text-sky-700 hover:bg-sky-100 dark:bg-neutral-800 dark:text-sky-400 dark:hover:bg-sky-950"
+                            class="border border-rule px-1.5 py-0.5 text-[10px] text-key transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent"
                             :title="`Open ${frame.file}:${frame.line}`"
                             @click.stop="openInEditor(frame)"
                         >
@@ -350,7 +343,7 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
 
-                    <pre class="whitespace-pre-wrap break-words text-neutral-500">{{ row.entry.details.join('\n') }}</pre>
+                    <pre class="whitespace-pre-wrap break-words text-[10.5px] leading-relaxed text-ink-2">{{ row.entry.details.join('\n') }}</pre>
                 </div>
             </div>
         </div>
