@@ -21,3 +21,32 @@ body {
 body {
     overflow: hidden;
 }
+
+@layer base {
+    /* Native widgets (select popups, scrollbars, checkboxes) paint themselves
+       from the colour scheme, not from our classes — without this they stay in
+       light mode inside the dark UI. */
+    html {
+        color-scheme: light;
+    }
+
+    html.dark {
+        color-scheme: dark;
+    }
+
+    /* A `<select>` hands its own background down to its popup list, so a
+       transparent control left the options drawing white text on white. Pin
+       both surfaces: `<option>` lives outside the component tree in the popup
+       and can't be reached with utility classes. */
+    select,
+    select option {
+        background-color: var(--color-white);
+        color: var(--color-neutral-900);
+    }
+
+    .dark select,
+    .dark select option {
+        background-color: var(--color-neutral-800);
+        color: var(--color-neutral-100);
+    }
+}

@@ -47,7 +47,7 @@ function save() {
                     <label class="block text-xs font-medium text-neutral-500">Theme</label>
                     <select
                         v-model="form.theme"
-                        class="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-neutral-700"
+                        class="mt-1 w-full rounded border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700"
                     >
                         <option value="dark">Dark</option>
                         <option value="light">Light</option>
@@ -68,7 +68,7 @@ function save() {
                     <label class="block text-xs font-medium text-neutral-500">Editor (click-to-source)</label>
                     <select
                         v-model="form.editor"
-                        class="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-neutral-700"
+                        class="mt-1 w-full rounded border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700"
                     >
                         <option value="phpstorm">PhpStorm</option>
                         <option value="vscode">VS Code</option>
@@ -83,7 +83,7 @@ function save() {
                     <label class="block text-xs font-medium text-neutral-500">Log streaming shell</label>
                     <select
                         v-model="form.logShell"
-                        class="mt-1 w-full rounded border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-neutral-700"
+                        class="mt-1 w-full rounded border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700"
                     >
                         <option value="gitbash">Git Bash — recommended</option>
                         <option value="wsl">WSL</option>

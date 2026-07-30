@@ -16,6 +16,17 @@ const MAX_ENTRIES = 2000;
 /** How much of it reaches the DOM — rows are unvirtualised, so this is a cap. */
 const MAX_ROWS = 500;
 
+// `tail -n 200` replays what is already in the file before it starts following,
+// and this component is recreated every time the Logs tab is opened — so
+// without a gate, opening the tab on a log that already holds errors fires a
+// notification for history the developer has already seen.
+//
+// The replay is written in one burst, so a short gap with no output marks its
+// end. The ceiling is the backstop: on a project erroring in a tight loop the
+// gap never comes, and notifications have to arm anyway.
+const BACKFILL_IDLE_MS = 400;
+const BACKFILL_CEILING_MS = 3000;
+
 const search = ref('');
 const activeLevels = ref(new Set());
 const expanded = ref(new Set());
@@ -28,6 +39,10 @@ const containerEl = ref(null);
 const pinned = ref(true);
 let unsubscribe = null;
 let lastNotifyAt = 0;
+// Notifications stay disarmed until the tail's backfill has drained.
+let notifyArmed = false;
+let idleHandle = null;
+let ceilingHandle = null;
 
 // The parser owns the entry list and mutates it in place; `entries` is a
 // shallowRef onto that same array, refreshed with triggerRef after each flush.
@@ -93,7 +108,33 @@ const statusMeta = computed(() => ({
 let flushHandle = null;
 let batch = [];
 
+function armNotifications() {
+    notifyArmed = true;
+    clearBackfillTimers();
+}
+
+function clearBackfillTimers() {
+    clearTimeout(idleHandle);
+    clearTimeout(ceilingHandle);
+    idleHandle = null;
+    ceilingHandle = null;
+}
+
+/**
+ * Called on start and again for every chunk that lands while still disarmed:
+ * each one pushes the idle deadline out, so the whole backfill burst — however
+ * many chunks it is split across — passes without notifying. A log that is
+ * empty or quiet never calls back in, hence arming from start() too.
+ */
+function delayNotifications() {
+    if (notifyArmed) return;
+    clearTimeout(idleHandle);
+    idleHandle = setTimeout(armNotifications, BACKFILL_IDLE_MS);
+}
+
 function appendChunk(chunk) {
+    delayNotifications();
+
     const fresh = accumulator.push(chunk);
     if (fresh.length) batch.push(...fresh);
     if (status.value !== 'live') status.value = 'live';
@@ -130,6 +171,13 @@ async function start() {
         status.value = 'idle';
         return;
     }
+
+    // Before the request, not after: the tail is spawned server-side and its
+    // first chunk can reach us ahead of the response.
+    notifyArmed = false;
+    clearBackfillTimers();
+    delayNotifications();
+    ceilingHandle = setTimeout(armNotifications, BACKFILL_CEILING_MS);
 
     status.value = 'connecting';
     errorMessage.value = '';
@@ -182,7 +230,7 @@ const shortPath = (file) => file.split(/[\\/]/).slice(-2).join('/');
 
 // A6: notify on newly-streamed severe entries (throttled so a burst is one ping).
 function maybeNotify(entry) {
-    if (!props.settings?.notifyErrors || !nativeAvailable()) return;
+    if (!notifyArmed || !props.settings?.notifyErrors || !nativeAvailable()) return;
     const now = Date.now();
     if (now - lastNotifyAt < 5000) return;
     lastNotifyAt = now;
@@ -214,6 +262,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
     unsubscribe?.();
     if (flushHandle !== null) cancelAnimationFrame(flushHandle);
+    clearBackfillTimers();
     stop();
 });
 </script>
