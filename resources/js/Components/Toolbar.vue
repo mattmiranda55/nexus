@@ -3,13 +3,14 @@ import { computed } from 'vue';
 
 const props = defineProps({
     running: { type: Boolean, default: false },
-    activeTab: { type: String, default: 'tinker' },
+    canStop: { type: Boolean, default: false }, // a background run is in flight
+    activeTab: { type: String, default: 'tinker' }, // tinker | logs
     hasProject: { type: Boolean, default: false },
     layout: { type: String, default: 'vertical' },
     platform: { type: String, default: 'Darwin' }, // PHP_OS_FAMILY
 });
 
-defineEmits(['run', 'update:activeTab', 'update:layout', 'history']);
+defineEmits(['run', 'stop', 'update:activeTab', 'update:layout', 'history']);
 
 // CodeMirror binds Mod-Enter, which is ⌘ on macOS and Ctrl everywhere else —
 // so the hint has to follow suit rather than always showing the Mac glyph.
@@ -19,6 +20,19 @@ const runKey = computed(() => (props.platform === 'Darwin' ? '⌘↵' : 'Ctrl+�
 <template>
     <div class="flex items-center gap-3 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
         <button
+            v-if="running && canStop"
+            type="button"
+            class="flex items-center gap-1.5 rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-500"
+            title="Stop the run"
+            @click="$emit('stop')"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5">
+                <rect x="4" y="4" width="12" height="12" rx="1.5" />
+            </svg>
+            Stop
+        </button>
+        <button
+            v-else
             type="button"
             class="flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
             :disabled="running || !hasProject"
@@ -47,14 +61,6 @@ const runKey = computed(() => (props.platform === 'Darwin' ? '⌘↵' : 'Ctrl+�
                 @click="$emit('update:activeTab', 'logs')"
             >
                 Logs
-            </button>
-            <button
-                type="button"
-                class="rounded px-3 py-1"
-                :class="activeTab === 'mail' ? 'bg-white shadow-sm dark:bg-neutral-700' : 'text-neutral-500'"
-                @click="$emit('update:activeTab', 'mail')"
-            >
-                Mail
             </button>
         </div>
 

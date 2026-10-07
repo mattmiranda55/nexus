@@ -1,6 +1,0 @@
-# Binaries are large and fetched at build time by scripts/fetch-mailpit.mjs
-# (wired into `prebuild` in config/nativephp.php). Don't commit them.
-mac/
-win/
-linux/
-LICENSE.mailpit

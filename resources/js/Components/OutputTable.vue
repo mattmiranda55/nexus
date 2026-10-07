@@ -79,7 +79,8 @@ function download(filename, text, type) {
     a.href = url;
     a.download = filename;
     a.click();
-    URL.revokeObjectURL(url);
+    // Revoking synchronously can cancel the download before it starts.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function csvEscape(v) {

@@ -17,6 +17,8 @@ class TinkerRunner
         private PhpBinaryResolver $resolver,
         private TinkerOutputParser $parser,
         private TinkerResultSerializer $serializer,
+        private TinkerScript $script,
+        private TargetEnvironment $environment,
     ) {}
 
     /**
@@ -30,7 +32,7 @@ class TinkerRunner
     {
         $projectPath = rtrim($projectPath, '/\\');
 
-        if (! is_file("{$projectPath}/artisan")) {
+        if (! is_file($projectPath.DIRECTORY_SEPARATOR.'artisan')) {
             return $this->failure('Invalid Laravel project path');
         }
 
@@ -40,11 +42,16 @@ class TinkerRunner
             return $this->failure($e->getMessage());
         }
 
-        $stdin = $this->serializer->preamble()
-            .$this->stripPhpTag($code)."\n"
-            .$this->serializer->emitter();
+        $script = $this->script->capture($code);
 
-        $process = new Process([$php, 'artisan', 'tinker'], $projectPath);
+        $stdin = $this->serializer->preamble()
+            .$script['code']."\n"
+            .$this->serializer->emitter()
+            // Last line on purpose: PsySH prints "= …" only for the final
+            // statement, and that line is what the raw view shows.
+            .($script['captured'] ? '$'.TinkerScript::RESULT_VAR.";\n" : '');
+
+        $process = new Process([$php, 'artisan', 'tinker'], $projectPath, $this->environment->isolate());
         $process->setTimeout(60);
         $process->setInput($stdin);
 
@@ -54,54 +61,25 @@ class TinkerRunner
             return $this->failure('Execution timed out (60s limit)');
         }
 
-        $full = $process->getOutput().$process->getErrorOutput();
+        $stdout = $process->getOutput();
+        $envelope = $this->extractEnvelope($stdout);
+
+        // An exception aborts the emitter, but the trailing result line still
+        // runs against an unset variable and prints "= null" — ours, not theirs.
+        if ($script['captured'] && $envelope === null) {
+            $stdout = preg_replace('/(?:^|\R)(?:> )?= null\s*$/', '', $stdout) ?? $stdout;
+        }
+
+        $raw = $this->stripMachinery($stdout);
+        if (($stderr = $process->getErrorOutput()) !== '') {
+            $raw = rtrim($raw, "\r\n")."\n".$stderr;
+        }
 
         return [
-            'envelope' => $this->extractEnvelope($full),
-            'raw' => $this->parser->parse($this->stripMachinery($full)),
+            'envelope' => $envelope,
+            'raw' => $this->parser->parse($raw, preg_split('/\R/', $stdin) ?: []),
             'error' => null,
         ];
-    }
-
-    public function run(string $projectPath, string $code): string
-    {
-        $projectPath = rtrim($projectPath, '/\\');
-
-        if (! is_file("{$projectPath}/artisan")) {
-            return 'Error: Invalid Laravel project path';
-        }
-
-        try {
-            $php = $this->resolver->resolve($projectPath);
-        } catch (\Throwable $e) {
-            return 'Error: '.$e->getMessage();
-        }
-
-        $process = new Process([$php, 'artisan', 'tinker'], $projectPath);
-        $process->setTimeout(60);
-        $process->setInput($this->stripPhpTag($code)."\n");
-
-        try {
-            $process->run();
-        } catch (ProcessTimedOutException) {
-            return 'Error: Execution timed out (60s limit)';
-        }
-
-        // Approximate Go's CombinedOutput by concatenating both streams.
-        $output = $process->getOutput().$process->getErrorOutput();
-
-        return $this->parser->parse($output);
-    }
-
-    /** Tinker doesn't want a leading `<?php` tag. */
-    private function stripPhpTag(string $code): string
-    {
-        $clean = trim($code);
-        if (str_starts_with($clean, '<?php')) {
-            $clean = trim(substr($clean, 5));
-        }
-
-        return $clean;
     }
 
     /** Pull the JSON envelope out from between the emitter's sentinels. */
@@ -123,19 +101,24 @@ class TinkerRunner
     }
 
     /**
-     * Remove the emitter's output (the sentinel-bearing line onward) so the raw
-     * view shows only the user's own dumps/results, not our machinery.
+     * Cut the emitter's sentinel-wrapped payload out so the raw view shows only
+     * the user's own dumps and results — keeping the "= …" line after it.
      */
     private function stripMachinery(string $output): string
     {
-        $pos = strpos($output, TinkerResultSerializer::START);
-        if ($pos === false) {
+        $start = strpos($output, TinkerResultSerializer::START);
+        $end = strrpos($output, TinkerResultSerializer::END);
+
+        if ($start === false) {
             return $output;
         }
 
-        $lineStart = strrpos(substr($output, 0, $pos), "\n");
+        // No END means the payload was cut short; drop everything after START.
+        $tail = $end === false || $end < $start
+            ? ''
+            : substr($output, $end + strlen(TinkerResultSerializer::END));
 
-        return $lineStart === false ? '' : substr($output, 0, $lineStart);
+        return substr($output, 0, $start).$tail;
     }
 
     /** @return array{envelope: null, raw: string, error: string} */

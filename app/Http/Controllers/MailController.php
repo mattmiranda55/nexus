@@ -5,148 +5,221 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\Setting;
 use App\Services\EnvWriter;
+use App\Services\Mail\MailCatcher;
+use App\Services\Mail\MailCatchers;
+use App\Services\MailpitAutostart;
 use App\Services\MailpitManager;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
+use Native\Desktop\Facades\ChildProcess;
 
 /**
- * Email hub: manages the Mailpit lifecycle and proxies its HTTP API, scoped to
- * the active project. The renderer connects to Mailpit's websocket directly for
- * live push; everything else goes through here so it stays CORS-free and can
- * honour a per-project API-URL override.
+ * Email hub. The inbox reads from whichever mail catcher is already running on
+ * this machine (smtp4dev, Mailpit, MailHog — see MailCatchers) and shows the
+ * mail in Nexus's own UI. Nexus's own Mailpit is the fallback: downloaded from
+ * Settings, then started with Nexus or at login as the user chose there.
+ *
+ * The inbox is global, not per project; the per-project part is whether each
+ * app's .env sends its mail to the chosen catcher.
  */
 class MailController extends Controller
 {
+    /** The ChildProcess relaying the catcher's live events (scripts/mail-watch.mjs). */
+    public const WATCH_ALIAS = 'mail-watch';
+
     public function __construct(
+        private MailCatchers $catchers,
         private MailpitManager $mailpit,
+        private MailpitAutostart $autostart,
         private EnvWriter $env,
     ) {}
 
-    /** Managed lifecycle + how the active project's .env is wired. */
+    /**
+     * Detect what's running and settle which one the inbox reads (see
+     * MailCatchers::pick). With nothing running and "start with Nexus"
+     * chosen, start Nexus's Mailpit; the UI polls while it binds.
+     */
     public function status(): JsonResponse
     {
-        $state = $this->mailpit->status();
-        $project = $this->activeProject();
+        $found = $this->catchers->detect();
+        $active = $this->catchers->pick($found);
+        $current = $this->catchers->active();
 
-        return response()->json([
-            ...$state,
-            'apiUrl' => $this->baseUrl($project),
-            'mail' => $project
-                ? $this->env->mailStatus($project->path, $this->mailpit->smtpPort())
-                : null,
-        ]);
+        if (($active ? MailCatchers::id($active) : null) !== ($current ? MailCatchers::id($current) : null)) {
+            $this->catchers->choose($active);
+        }
+
+        $starting = $this->mailpit->startWithNexus($found);
+
+        return response()->json($this->state($found, $active) + ['mailpitStarting' => $starting]);
     }
 
-    /** Reuse a detected instance or launch the bundled binary. */
-    public function start(): JsonResponse
+    /**
+     * Relay the active catcher's live events to the UI through a ChildProcess
+     * (the app window can't hold these sockets itself — Mailpit rejects a
+     * cross-origin websocket). `live: false` means poll instead.
+     */
+    public function watch(): JsonResponse
     {
-        $state = $this->mailpit->ensureRunning();
-        $project = $this->activeProject();
+        $catcher = $this->catchers->active();
+        $live = $catcher?->live();
 
-        return response()->json([...$state, 'apiUrl' => $this->baseUrl($project)]);
+        try {
+            ChildProcess::stop(self::WATCH_ALIAS);
+        } catch (\Throwable) {
+            //
+        }
+
+        if (! $live || $live['type'] === 'poll' || ! config('nativephp-internal.running')) {
+            return response()->json(['live' => false]);
+        }
+
+        try {
+            ChildProcess::node([
+                base_path('scripts'.DIRECTORY_SEPARATOR.'mail-watch.mjs'),
+                $live['type'],
+                $live['url'],
+            ], self::WATCH_ALIAS);
+        } catch (\Throwable) {
+            return response()->json(['live' => false]);
+        }
+
+        return response()->json(['live' => true]);
     }
 
     public function messages(): JsonResponse
     {
-        return $this->proxyJson('get', '/api/v1/messages?limit=200');
+        return $this->withCatcher(fn (MailCatcher $c) => ['messages' => $c->messages()]);
     }
 
     public function message(string $id): JsonResponse
     {
         $id = $this->safeId($id);
+        if ($id === '') {
+            return response()->json(['error' => 'Unknown message'], 404);
+        }
 
-        return $this->proxyJson('get', "/api/v1/message/{$id}");
+        return $this->withCatcher(fn (MailCatcher $c) => $c->message($id));
     }
 
     public function raw(string $id): JsonResponse
     {
         $id = $this->safeId($id);
-        $base = $this->baseUrl($this->activeProject());
-
-        try {
-            $response = Http::timeout(5)->get("{$base}/api/v1/message/{$id}/raw");
-        } catch (\Throwable $e) {
-            return response()->json(['error' => $this->unreachable()], 502);
+        if ($id === '') {
+            return response()->json(['error' => 'Unknown message'], 404);
         }
 
-        return response()->json(['raw' => $response->body()]);
+        return $this->withCatcher(fn (MailCatcher $c) => ['raw' => $c->raw($id)]);
     }
 
     /** Clear the whole inbox. */
     public function destroy(): JsonResponse
     {
-        return $this->proxyJson('delete', '/api/v1/messages');
+        return $this->withCatcher(function (MailCatcher $c) {
+            $c->deleteAll();
+
+            return ['ok' => true];
+        });
     }
 
-    /** One-click "connect this app": wire the active project's .env to Mailpit. */
-    public function connect(): JsonResponse
+    /** One-click "connect this app": point a project's .env at the active catcher. */
+    public function connect(Project $project): JsonResponse
     {
-        $project = $this->activeProject();
-        if (! $project) {
-            return response()->json(['error' => 'No project selected'], 422);
+        $catcher = $this->catchers->active();
+        if (! $catcher) {
+            return response()->json(['ok' => false, 'error' => 'No mail server selected'], 422);
         }
 
-        $result = $this->env->connectMailpit(
-            $project->path,
-            parse_url($this->baseUrl($project), PHP_URL_HOST) ?: '127.0.0.1',
-            $this->mailpit->smtpPort(),
-        );
+        $result = $this->env->connectMailpit($project->path, $catcher->smtpHost(), $catcher->smtpPort());
 
         return response()->json($result, $result['ok'] ? 200 : 422);
     }
 
-    /** Set (or clear) the per-project Mailpit API URL override. */
-    public function config(Request $request): JsonResponse
+    // --- The bundled Mailpit fallback ----------------------------------------
+
+    /** Start Nexus's Mailpit once, for this session. The UI then polls status. */
+    public function startMailpit(): JsonResponse
     {
-        $data = $request->validate(['mailUrl' => 'nullable|url']);
-        $project = $this->activeProject();
-        if (! $project) {
-            return response()->json(['error' => 'No project selected'], 422);
-        }
-
-        $project->update(['mail_url' => $data['mailUrl'] ?: null]);
-
-        return response()->json(['ok' => true, 'apiUrl' => $this->baseUrl($project)]);
+        return response()->json(['state' => $this->mailpit->start()]);
     }
 
-    private function proxyJson(string $method, string $path): JsonResponse
+    /** Download Mailpit into storage; the UI waits for the process to exit. */
+    public function downloadMailpit(): JsonResponse
     {
-        $base = $this->baseUrl($this->activeProject());
+        $started = $this->mailpit->download();
+
+        return response()->json(
+            ['started' => $started, 'alias' => MailpitManager::DOWNLOAD_ALIAS],
+            $started ? 200 : 422,
+        );
+    }
+
+    /** Delete the downloaded Mailpit (and its login item). */
+    public function removeMailpit(): JsonResponse
+    {
+        if ($this->autostart->supported() && $this->autostart->enabled()) {
+            $this->autostart->disable();
+        }
+        Setting::current()->update(['mailpit_mode' => 'off']);
+
+        if (! $this->mailpit->remove()) {
+            return response()->json(['ok' => false, 'error' => 'Mailpit is still running. Quit it and try again.'], 409);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    // -------------------------------------------------------------------------
+
+    /** @param  list<MailCatcher>  $found */
+    private function state(array $found, ?MailCatcher $active): array
+    {
+        return [
+            'sources' => array_map(fn ($c) => MailCatchers::describe($c), $found),
+            'active' => $active ? MailCatchers::describe($active) : null,
+            'projects' => $active ? $this->wiring($active) : [],
+            'pin' => Setting::current()->mail_pin,
+            'mailpit' => [
+                'installed' => $this->mailpit->resolveBinary() !== null,
+                'version' => $this->mailpit->version(),
+                'mode' => Setting::current()->mailpit_mode,
+                'loginSupported' => $this->autostart->supported(),
+            ],
+        ];
+    }
+
+    /** Which projects' .env files send their mail to $catcher. */
+    private function wiring(MailCatcher $catcher): array
+    {
+        return Project::orderBy('name')->get()->map(function (Project $project) use ($catcher) {
+            $mail = $this->env->mailStatus($project->path, $catcher->smtpPort());
+
+            return [
+                'id' => $project->id,
+                'name' => $project->name,
+                'hasEnv' => $mail['exists'],
+                'connected' => $mail['connected'],
+            ];
+        })->all();
+    }
+
+    /** Run against the active catcher, turning any failure into a 502. */
+    private function withCatcher(callable $callback): JsonResponse
+    {
+        $catcher = $this->catchers->active();
+        if (! $catcher) {
+            return response()->json(['error' => 'No mail server selected.'], 409);
+        }
 
         try {
-            $response = Http::timeout(5)->{$method}("{$base}{$path}");
-        } catch (\Throwable $e) {
-            return response()->json(['error' => $this->unreachable()], 502);
+            return response()->json($callback($catcher));
+        } catch (\Throwable) {
+            return response()->json(['error' => "{$catcher->label()} isn't reachable at {$catcher->url()}."], 502);
         }
-
-        if (! $response->successful()) {
-            return response()->json(['error' => $this->unreachable()], 502);
-        }
-
-        return response()->json($response->json() ?? []);
     }
 
-    private function baseUrl(?Project $project): string
-    {
-        return $project?->mail_url ?: $this->mailpit->apiUrl();
-    }
-
-    private function activeProject(): ?Project
-    {
-        $id = Setting::current()->active_project_id;
-
-        return $id ? Project::find($id) : null;
-    }
-
-    /** Mailpit message IDs are opaque tokens; keep them URL/path safe. */
+    /** Message IDs are opaque tokens (Mailpit ids, smtp4dev GUIDs, MailHog ids@host). */
     private function safeId(string $id): string
     {
-        return preg_replace('/[^A-Za-z0-9\-_]/', '', $id);
-    }
-
-    private function unreachable(): string
-    {
-        return 'Mailpit is not reachable. Start it from the Mail tab.';
+        return preg_replace('/[^A-Za-z0-9\-_.@]/', '', $id);
     }
 }

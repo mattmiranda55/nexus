@@ -16,19 +16,30 @@ class ProjectController extends Controller
      */
     public function store(): RedirectResponse
     {
-        $path = Dialog::new()
-            ->title('Select a Laravel project')
-            ->folders()
-            ->open();
+        try {
+            $path = Dialog::new()
+                ->title('Select a Laravel project')
+                ->folders()
+                ->open();
+        } catch (\Throwable) {
+            return to_route('console')->with('error', 'The folder picker is only available in the desktop app.');
+        }
 
         // A folder picker returns a single path string, or null if cancelled.
         $path = is_array($path) ? ($path[0] ?? null) : $path;
 
-        if (! $path) {
+        if (! is_string($path) || $path === '') {
             return to_route('console');
         }
 
-        if (! File::exists(rtrim($path, '/\\').DIRECTORY_SEPARATOR.'artisan')) {
+        // One spelling per folder, or "/app" and "/app/" register twice. A bare
+        // root ("/", "C:\\") keeps its separator.
+        $path = rtrim($path, '/\\') ?: $path;
+        if (preg_match('/^[A-Za-z]:$/', $path)) {
+            $path .= DIRECTORY_SEPARATOR;
+        }
+
+        if (! File::isDirectory($path) || ! File::isFile(rtrim($path, '/\\').DIRECTORY_SEPARATOR.'artisan')) {
             return to_route('console')->with('error', 'That folder is not a Laravel project (no artisan file found).');
         }
 

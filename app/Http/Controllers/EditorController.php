@@ -18,8 +18,8 @@ class EditorController extends Controller
     public function open(Request $request, EditorUrlBuilder $urls): JsonResponse
     {
         $data = $request->validate([
-            'file' => 'required|string',
-            'line' => 'nullable|integer|min:1',
+            'file' => ['required', 'string', 'max:4096', 'not_regex:/[\x00-\x1F\x7F]/'],
+            'line' => 'nullable|integer|min:1|max:10000000',
         ]);
 
         $editor = Setting::current()->editor ?: 'vscode';

@@ -1,5 +1,6 @@
 <script setup>
 defineProps({
+    view: { type: String, default: 'project' }, // project | mail
     activeProject: { type: Object, default: null },
     running: { type: Boolean, default: false },
     theme: { type: String, default: 'dark' },
@@ -8,7 +9,7 @@ defineProps({
 
 <template>
     <footer class="flex items-center gap-3 border-t border-neutral-200 px-3 py-1 text-[11px] text-neutral-500 dark:border-neutral-800">
-        <span class="truncate">{{ activeProject ? activeProject.name : 'No project' }}</span>
+        <span class="truncate">{{ view === 'mail' ? 'Mail · shared by all projects' : activeProject ? activeProject.name : 'No project' }}</span>
 
         <span class="flex items-center gap-1">
             <span

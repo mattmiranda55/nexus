@@ -26,11 +26,11 @@ class EditorUrlBuilderTest extends TestCase
         $this->assertStringContainsString('subl://open?url=file://%2Fapp', $b->build('sublime', '/app/Foo.php', 12));
     }
 
-    public function test_unknown_editor_falls_back_to_phpstorm(): void
+    public function test_unknown_editor_falls_back_to_vscode(): void
     {
         $b = new EditorUrlBuilder;
 
-        $this->assertStringStartsWith('phpstorm://', $b->build('mystery', '/app/Foo.php'));
+        $this->assertStringStartsWith('vscode://file/', $b->build('mystery', '/app/Foo.php'));
     }
 
     public function test_windows_paths_get_forward_slashes_and_a_leading_slash(): void
@@ -55,6 +55,16 @@ class EditorUrlBuilderTest extends TestCase
         $this->assertSame(
             'subl://open?url=file://%2FC%3A%2Fapp%2FFoo.php&line=12',
             $b->build('sublime', 'C:\\app\\Foo.php', 12),
+        );
+    }
+
+    public function test_url_syntax_in_a_path_is_encoded_not_interpreted(): void
+    {
+        $b = new EditorUrlBuilder;
+
+        $this->assertSame(
+            'vscode://file/app/We%20ird%3Fx%3D1%23frag.php:3',
+            $b->build('vscode', '/app/We ird?x=1#frag.php', 3),
         );
     }
 

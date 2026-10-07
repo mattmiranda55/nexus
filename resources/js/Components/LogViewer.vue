@@ -43,6 +43,9 @@ let lastNotifyAt = 0;
 let notifyArmed = false;
 let idleHandle = null;
 let ceilingHandle = null;
+// Bumped per start(); a slower response for a project we've since switched
+// away from must not overwrite the current status.
+let startToken = 0;
 
 // The parser owns the entry list and mutates it in place; `entries` is a
 // shallowRef onto that same array, refreshed with triggerRef after each flush.
@@ -168,6 +171,7 @@ function onScroll() {
 // quiet log is silent — so the start response is what settles the status.
 async function start() {
     if (!props.activeProject) {
+        startToken++;
         status.value = 'idle';
         return;
     }
@@ -182,7 +186,9 @@ async function start() {
     status.value = 'connecting';
     errorMessage.value = '';
 
+    const token = ++startToken;
     const { ok, data } = await postJson('/logs/start');
+    if (token !== startToken) return;
     logPath.value = data?.path ?? '';
 
     if (ok) {
@@ -260,6 +266,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    startToken++;
     unsubscribe?.();
     if (flushHandle !== null) cancelAnimationFrame(flushHandle);
     clearBackfillTimers();

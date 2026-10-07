@@ -36,7 +36,7 @@ class LogController extends Controller
         $path = file_exists($project->logPath()) ? $project->logPath() : $project->legacyLogPath();
 
         // Restart cleanly if a tail is already running.
-        ChildProcess::stop(self::ALIAS);
+        $this->stopTail();
 
         // `tail -F` on a nonexistent path stays silent and waits for the file to
         // appear, so the UI would sit on "Connecting…" forever. Answer up front
@@ -82,8 +82,21 @@ class LogController extends Controller
 
     public function stop(): JsonResponse
     {
-        ChildProcess::stop(self::ALIAS);
+        $this->stopTail();
 
         return response()->json(['status' => 'stopped']);
+    }
+
+    /**
+     * Best-effort: stopping a tail that isn't running is fine, and outside the
+     * desktop runtime the facade throws — the start() path reports that.
+     */
+    private function stopTail(): void
+    {
+        try {
+            ChildProcess::stop(self::ALIAS);
+        } catch (\Throwable) {
+            //
+        }
     }
 }

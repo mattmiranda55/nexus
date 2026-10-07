@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
-use Native\Desktop\Facades\Window;
+use App\Models\Setting;
+use App\Services\Mail\MailCatchers;
+use App\Services\MailpitManager;
 use Native\Desktop\Contracts\ProvidesPhpIni;
+use Native\Desktop\Facades\Window;
 
 class NativeAppServiceProvider implements ProvidesPhpIni
 {
@@ -19,7 +22,31 @@ class NativeAppServiceProvider implements ProvidesPhpIni
             ->height(700)
             ->minWidth(768)
             ->minHeight(576)
-            ->rememberState();
+            ->rememberState()
+            // This window carries NativePHP's preload bridge (window.Native).
+            // A link that opened a new window or navigated it off-host would
+            // hand that bridge to an external page; external links go through
+            // LinkController to the OS browser instead.
+            ->suppressNewWindows()
+            ->preventLeaveDomain();
+
+        $this->startMailpitWithNexus();
+    }
+
+    /**
+     * Settings → Mail → "Start with Nexus": run the downloaded Mailpit for this
+     * session, but only when no other mail server is running — whatever the
+     * user already has always wins. It dies with the app (it's a ChildProcess).
+     */
+    private function startMailpitWithNexus(): void
+    {
+        try {
+            if (Setting::current()->mailpit_mode === 'nexus') {
+                app(MailpitManager::class)->startWithNexus(app(MailCatchers::class)->detect());
+            }
+        } catch (\Throwable) {
+            // Never let mail setup keep the window from opening.
+        }
     }
 
     /**

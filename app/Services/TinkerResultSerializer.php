@@ -37,15 +37,16 @@ class TinkerResultSerializer
     }
 
     /**
-     * The trailing line: serialize the last-evaluated value ($_) and print the
-     * JSON envelope wrapped in sentinels. Lenient JSON flags keep binary/invalid
-     * UTF-8 from aborting the whole encode.
+     * Serialize the value TinkerScript captured from the user's final
+     * expression and print the JSON envelope wrapped in sentinels. Lenient
+     * JSON flags keep binary/invalid UTF-8 from aborting the whole encode.
      */
     public function emitter(): string
     {
         $flags = 'JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES '
             .'| JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE';
+        $value = '$'.TinkerScript::RESULT_VAR.' ?? null';
 
-        return 'echo "'.self::START.'".json_encode(nexus_envelope($_ ?? null), '.$flags.')."'.self::END.'";'."\n";
+        return 'echo "'.self::START.'".json_encode(nexus_envelope('.$value.'), '.$flags.')."'.self::END.'";'."\n";
     }
 }

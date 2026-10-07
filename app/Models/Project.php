@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Project extends Model
 {
-    protected $fillable = ['name', 'path', 'mail_url'];
+    protected $fillable = ['name', 'path'];
 
     /**
      * The conventional path to this project's Laravel log file, in the host
@@ -21,7 +21,8 @@ class Project extends Model
         return $base.DIRECTORY_SEPARATOR.implode(DIRECTORY_SEPARATOR, $parts);
     }
 
-    public function legacyLogPath(): string {
+    public function legacyLogPath(): string
+    {
         $base = rtrim($this->path, '/\\');
         $parts = ['app', 'storage', 'logs', 'laravel.log'];
 

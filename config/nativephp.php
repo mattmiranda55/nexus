@@ -158,11 +158,6 @@ return [
      * Define your own scripts to run before and after the build process.
      */
     'prebuild' => [
-        // Fetch the Mailpit binary for the platform being built. This used to be
-        // a manual step against a POSIX-only download.sh, which is why packaged
-        // Windows builds shipped without one and the Mail tab could never work
-        // there. Skips the download when the binary is already in place.
-        'node scripts/fetch-mailpit.mjs',
         'npm run build',
         'php artisan optimize',
     ],

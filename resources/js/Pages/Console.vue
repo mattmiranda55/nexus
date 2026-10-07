@@ -7,7 +7,9 @@ import HistoryModal from '../Components/HistoryModal.vue';
 import Toolbar from '../Components/Toolbar.vue';
 import Output from '../Components/Output.vue';
 import StatusBar from '../Components/StatusBar.vue';
-import { postJson } from '../lib/http.js';
+import { deleteJson, getJson, postJson } from '../lib/http.js';
+import { onChildProcessExit, onChildProcessMessage } from '../lib/nativeEvents.js';
+import { watchTinkerRun } from '../lib/tinkerRun.js';
 
 // Lazy-loaded so the CodeMirror editor (the bundle's heaviest dependency) and
 // the log viewer don't block the app shell's first paint.
@@ -25,9 +27,19 @@ const props = defineProps({
 const page = usePage();
 const settingsOpen = ref(false);
 const historyOpen = ref(false);
-const activeTab = ref('tinker'); // tinker | logs | mail
+// Mail isn't per project (several apps usually share one Mailpit), so it's
+// its own destination in the sidebar rather than a tab of the project view.
+const view = ref('project'); // project | mail
+const activeTab = ref('tinker'); // tinker | logs (within the project view)
+// The inbox mounts on first visit and then stays alive (hidden) so its live
+// connection keeps the sidebar's unread badge current.
+const mailVisited = ref(false);
+const unread = ref(0);
 const layout = ref('vertical'); // vertical (stacked) | horizontal (side-by-side)
 const running = ref(false);
+// Set while a background run can be stopped: { id, watcher }. Inline runs
+// (outside the desktop app) block the server, so they can't be.
+const stoppable = ref(null);
 
 const DEFAULT_CODE = "// Explore your app — Cmd/Ctrl+Enter to run\nUser::count();";
 
@@ -75,24 +87,62 @@ async function runTinker() {
     // the project it actually ran against, not whatever is active on return.
     const key = bufferKey(props.activeProjectId);
     running.value = true;
+    view.value = 'project';
     activeTab.value = 'tinker';
+    // In the desktop app the run happens in a background worker (202), so the
+    // rest of the UI keeps responding; elsewhere it comes back inline (200).
+    const id = crypto.randomUUID();
+    const watcher = watchTinkerRun(id, {
+        fetchResult: (runId, exited) => getJson(`/tinker/${runId}${exited ? '?exited=1' : ''}`),
+        onMessage: onChildProcessMessage,
+        onExit: onChildProcessExit,
+    });
     try {
-        const { data } = await postJson('/tinker', { code: code.value });
+        let { ok, status, data } = await postJson('/tinker', { code: code.value, id });
+        if (status === 202) {
+            stoppable.value = { id, watcher };
+            ({ ok, status, data } = await watcher.result());
+        }
         outputs.value[key] = {
             envelope: data?.envelope ?? null,
-            raw: data?.raw ?? data?.output ?? '(no output)',
+            raw: data?.raw ?? data?.output ?? (ok ? '(no output)' : requestError(status, data)),
             logged: data?.loggedDuringRun ?? null,
         };
     } catch (e) {
         outputs.value[key] = { envelope: null, raw: 'Error: ' + e.message, logged: null };
     } finally {
+        watcher.stop();
+        stoppable.value = null;
         running.value = false;
     }
+}
+
+// Kills the worker; the pending runTinker() then settles with the stop
+// endpoint's response (or the real result, if it finished just before).
+function stopTinker() {
+    const run = stoppable.value;
+    if (!run) return;
+    stoppable.value = null;
+    run.watcher.cancel(() => deleteJson(`/tinker/${run.id}`));
+}
+
+// A failed request with no tinker output of its own: say what went wrong
+// rather than showing a blank result.
+function requestError(status, data) {
+    if (status === 419) return 'Error: the session expired. Reload the window (Cmd/Ctrl+R) and run again.';
+    const message = data?.message ?? data?.error;
+    return `Error: the run request failed (HTTP ${status})${message ? ` — ${message}` : ''}`;
+}
+
+function showMail() {
+    view.value = 'mail';
+    mailVisited.value = true;
 }
 
 // Restore = load into the buffer and show it; running stays a deliberate ⌘↵.
 function restoreRun(run) {
     code.value = run.code;
+    view.value = 'project';
     activeTab.value = 'tinker';
     historyOpen.value = false;
 }
@@ -105,21 +155,30 @@ function restoreRun(run) {
         <Sidebar
             :projects="projects"
             :active-project-id="activeProjectId"
+            :mail-active="view === 'mail'"
+            :unread="unread"
             @open-settings="settingsOpen = true"
+            @open-mail="showMail"
+            @show-project="view = 'project'"
         />
 
         <main class="flex min-w-0 flex-1 flex-col">
             <Toolbar
+                v-show="view === 'project'"
                 :running="running"
+                :can-stop="!!stoppable"
                 v-model:active-tab="activeTab"
                 v-model:layout="layout"
                 :has-project="!!activeProject"
                 :platform="platform"
                 @run="runTinker"
+                @stop="stopTinker"
                 @history="historyOpen = true"
             />
 
-            <div class="flex min-h-0 flex-1 flex-col">
+            <!-- v-show, not v-if: a look at the inbox shouldn't tear down the
+                 editor (cursor, undo history) or restart the log tail. -->
+            <div v-show="view === 'project'" class="flex min-h-0 flex-1 flex-col">
                 <template v-if="activeTab === 'tinker'">
                     <div
                         class="flex min-h-0 flex-1"
@@ -140,12 +199,18 @@ function restoreRun(run) {
                     </div>
                 </template>
 
-                <LogViewer v-else-if="activeTab === 'logs'" :active-project="activeProject" :settings="settings" />
-
-                <MailInbox v-else :active-project="activeProject" />
+                <LogViewer v-else :active-project="activeProject" :settings="settings" />
             </div>
 
-            <StatusBar :active-project="activeProject" :running="running" :theme="settings.theme" />
+            <div v-if="mailVisited" v-show="view === 'mail'" class="flex min-h-0 flex-1 flex-col">
+                <MailInbox
+                    :settings-key="[settings.mailUrl, settings.mailPin, settings.mailpitMode].join('|')"
+                    @unread="unread = $event"
+                    @open-settings="settingsOpen = true"
+                />
+            </div>
+
+            <StatusBar :view="view" :active-project="activeProject" :running="running" :theme="settings.theme" />
         </main>
 
         <SettingsModal

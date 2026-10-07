@@ -1,20 +1,30 @@
 // Bridges NativePHP's injected `window.Native` event stream to the app.
-// Registers a single global listener and fans messages out to subscribers,
-// so components can mount/unmount without stacking duplicate listeners.
+// Registers a single global listener per event type and fans messages out to
+// subscribers, so components can mount/unmount without stacking duplicate
+// listeners.
 
-const EVENT = 'Native\\Desktop\\Events\\ChildProcess\\MessageReceived';
-const subscribers = new Set();
-let registered = false;
+const MESSAGE = 'Native\\Desktop\\Events\\ChildProcess\\MessageReceived';
+const EXITED = 'Native\\Desktop\\Events\\ChildProcess\\ProcessExited';
+const STARTUP_ERROR = 'Native\\Desktop\\Events\\ChildProcess\\StartupError';
 
-function ensureRegistered() {
-    if (registered || typeof window === 'undefined') return;
+const subscribers = new Map(); // event -> Set of handlers
+// An event is marked as soon as its registration is under way — not when it
+// completes — so two components subscribing before `native:init` fires don't
+// each queue their own bind and end up delivering every message twice.
+const registering = new Set();
+
+function ensureRegistered(event) {
+    if (registering.has(event) || typeof window === 'undefined') return;
+    registering.add(event);
 
     const bind = () => {
-        if (!window.Native?.on) return;
-        window.Native.on(EVENT, (event) => {
-            for (const sub of subscribers) sub(event);
+        if (!window.Native?.on) {
+            registering.delete(event); // let the next subscriber try again
+            return;
+        }
+        window.Native.on(event, (payload) => {
+            for (const sub of subscribers.get(event) ?? []) sub(payload);
         });
-        registered = true;
     };
 
     // `window.Native` is only present inside the NativePHP (Electron) runtime,
@@ -23,19 +33,38 @@ function ensureRegistered() {
     else window.addEventListener('native:init', bind, { once: true });
 }
 
+function subscribe(event, alias, callback) {
+    ensureRegistered(event);
+
+    const sub = (payload) => {
+        if (payload?.alias === alias) callback(payload);
+    };
+    if (!subscribers.has(event)) subscribers.set(event, new Set());
+    subscribers.get(event).add(sub);
+
+    return () => subscribers.get(event).delete(sub);
+}
+
 /**
  * Subscribe to child-process stdout for a given alias.
  * Returns an unsubscribe function.
  */
 export function onChildProcessMessage(alias, callback) {
-    ensureRegistered();
+    return subscribe(MESSAGE, alias, (payload) => callback(payload.data ?? ''));
+}
 
-    const sub = (event) => {
-        if (event?.alias === alias) callback(event.data ?? '');
-    };
-    subscribers.add(sub);
+/**
+ * Subscribe to a child process ending — exiting, or failing to start at all.
+ * The callback gets the exit code (null when it never started).
+ * Returns an unsubscribe function.
+ */
+export function onChildProcessExit(alias, callback) {
+    const stops = [
+        subscribe(EXITED, alias, (payload) => callback(payload.code ?? null)),
+        subscribe(STARTUP_ERROR, alias, () => callback(null)),
+    ];
 
-    return () => subscribers.delete(sub);
+    return () => stops.forEach((stop) => stop());
 }
 
 export function nativeAvailable() {

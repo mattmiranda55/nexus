@@ -45,7 +45,7 @@ class PhpBinaryResolver
         if ($override = Setting::current()->php_path) {
             $candidates[] = $override;
         }
-        if ($env = trim((string) getenv('NEXUS_PHP_PATH'))) {
+        if ($env = trim((string) config('nexus.php_path'))) {
             $candidates[] = $env;
         }
 

@@ -5,9 +5,11 @@ import { router } from '@inertiajs/vue3';
 const props = defineProps({
     projects: { type: Array, default: () => [] },
     activeProjectId: { type: [Number, null], default: null },
+    mailActive: { type: Boolean, default: false },
+    unread: { type: Number, default: 0 },
 });
 
-defineEmits(['open-settings']);
+const emit = defineEmits(['open-settings', 'open-mail', 'show-project']);
 
 const menu = ref({ open: false, x: 0, y: 0, project: null });
 
@@ -17,6 +19,8 @@ function addProject() {
 }
 
 function activate(project) {
+    // Clicking a project always brings its view back, even from Mail.
+    emit('show-project');
     if (project.id === props.activeProjectId) return;
     router.post(`/projects/${project.id}/activate`, {}, {
         preserveScroll: true,
@@ -24,8 +28,15 @@ function activate(project) {
     });
 }
 
+// Rough menu footprint, so a right-click near the window edge doesn't open it
+// half off-screen.
+const MENU_WIDTH = 176;
+const MENU_HEIGHT = 80;
+
 function openMenu(event, project) {
-    menu.value = { open: true, x: event.clientX, y: event.clientY, project };
+    const x = Math.min(event.clientX, window.innerWidth - MENU_WIDTH);
+    const y = Math.min(event.clientY, window.innerHeight - MENU_HEIGHT);
+    menu.value = { open: true, x: Math.max(0, x), y: Math.max(0, y), project };
 }
 
 function closeMenu() {
@@ -33,16 +44,21 @@ function closeMenu() {
 }
 
 async function copyPath() {
-    if (menu.value.project) {
-        await navigator.clipboard.writeText(menu.value.project.path);
-    }
+    const project = menu.value.project;
     closeMenu();
+    if (!project) return;
+    try {
+        await navigator.clipboard.writeText(project.path);
+    } catch {
+        // Clipboard access can be refused; nothing useful to do about it here.
+    }
 }
 
 function removeProject() {
     const project = menu.value.project;
     closeMenu();
-    if (project) {
+    // Removing also deletes the project's run history (cascade), so confirm.
+    if (project && window.confirm(`Remove "${project.name}" from Nexus? Its run history will be deleted. Files on disk are not touched.`)) {
         router.delete(`/projects/${project.id}`, { preserveScroll: true });
     }
 }
@@ -64,15 +80,41 @@ function removeProject() {
             </button>
         </div>
 
+        <div class="px-2">
+            <button
+                type="button"
+                class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-neutral-200 dark:hover:bg-neutral-800"
+                :class="mailActive
+                    ? 'bg-neutral-200 font-medium dark:bg-neutral-800'
+                    : 'text-neutral-700 dark:text-neutral-300'"
+                @click="$emit('open-mail')"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 shrink-0 text-neutral-500">
+                    <path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3Z" />
+                    <path d="m19 8.839-7.77 3.885a2.75 2.75 0 0 1-2.46 0L1 8.839V14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.839Z" />
+                </svg>
+                Mail
+                <span
+                    v-if="unread"
+                    class="ml-auto rounded-full bg-sky-100 px-1.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/60 dark:text-sky-300"
+                    :title="`${unread} unread`"
+                >{{ unread > 99 ? '99+' : unread }}</span>
+            </button>
+        </div>
+
+        <div class="px-4 pb-1 pt-4 text-[10px] font-medium uppercase tracking-wider text-neutral-400">Projects</div>
+
         <div class="flex-1 overflow-y-auto px-2">
             <ul v-if="projects.length" class="space-y-0.5">
                 <li v-for="project in projects" :key="project.id">
                     <button
                         type="button"
                         class="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-neutral-200 dark:hover:bg-neutral-800"
-                        :class="project.id === activeProjectId
-                            ? 'bg-neutral-200 font-medium dark:bg-neutral-800'
-                            : 'text-neutral-700 dark:text-neutral-300'"
+                        :class="project.id !== activeProjectId
+                            ? 'text-neutral-700 dark:text-neutral-300'
+                            : mailActive
+                                ? 'font-medium'
+                                : 'bg-neutral-200 font-medium dark:bg-neutral-800'"
                         @click="activate(project)"
                         @contextmenu.prevent="openMenu($event, project)"
                     >

@@ -76,7 +76,7 @@ class LogTailCommand
     {
         $candidates = [];
 
-        if ($override = trim((string) env('NEXUS_GIT_BASH_PATH'))) {
+        if ($override = trim((string) config('nexus.git_bash_path'))) {
             $candidates[] = $override;
         }
 

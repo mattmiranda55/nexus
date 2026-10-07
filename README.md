@@ -24,8 +24,8 @@ composer native:dev        # launches the Electron window + vite dev server
 ```
 
 `npm run setup` is idempotent — re-run it any time. It verifies PHP, Composer
-and Node are on PATH, creates `.env`, installs both dependency trees, downloads
-the Mailpit binary for your platform, migrates **both** databases (see the
+and Node are on PATH, creates `.env`, installs both dependency trees, migrates
+**both** databases (see the
 Windows notes on why there are two), and builds the frontend.
 
 After bumping `nativephp/desktop`, run `composer native:dev:deps` once to

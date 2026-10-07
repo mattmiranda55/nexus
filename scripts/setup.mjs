@@ -57,20 +57,45 @@ function version(command, args) {
 
 log.step('Checking prerequisites');
 
+// Minimums: PHP from composer.json (^8.3), Node from NativePHP's Electron
+// package (engines.node >=22). Presence alone isn't enough — an older PHP
+// fails composer install with a wall of platform errors, an older Node fails
+// deep inside the Electron build.
 const prerequisites = [
-    { name: 'PHP', command: 'php', args: ['-v'], hint: 'https://php.net/downloads (8.2+). Laravel Herd bundles one.' },
+    { name: 'PHP', command: 'php', args: ['-v'], min: [8, 3], hint: 'https://php.net/downloads (8.3+). Laravel Herd bundles one.' },
     { name: 'Composer', command: 'composer', args: ['-V'], hint: 'https://getcomposer.org/download/' },
-    { name: 'Node', command: 'node', args: ['-v'], hint: 'https://nodejs.org (20+)' },
+    { name: 'Node', command: 'node', args: ['-v'], min: [22, 0], hint: 'https://nodejs.org (22+)' },
     { name: 'npm', command: 'npm', args: ['-v'], hint: 'ships with Node' },
 ];
 
-for (const { name, command, args, hint } of prerequisites) {
+/** First "major.minor" in a version banner, e.g. "PHP 8.4.1 (cli)" -> [8, 4]. */
+function parseVersion(text) {
+    const match = text.match(/(\d+)\.(\d+)/);
+    return match ? [Number(match[1]), Number(match[2])] : null;
+}
+
+function atLeast([major, minor], [minMajor, minMinor]) {
+    return major > minMajor || (major === minMajor && minor >= minMinor);
+}
+
+for (const { name, command, args, min, hint } of prerequisites) {
     const found = version(command, args);
-    found ? log.ok(`${name} — ${found}`) : log.fail(`${name} not found on PATH. ${hint}`);
+    if (!found) {
+        log.fail(`${name} not found on PATH. ${hint}`);
+        continue;
+    }
+
+    const parsed = min ? parseVersion(found) : null;
+    if (min && parsed && !atLeast(parsed, min)) {
+        log.fail(`${name} — ${found} is too old; ${min.join('.')}+ is required. ${hint}`);
+        continue;
+    }
+
+    log.ok(`${name} — ${found}`);
 }
 
 if (failed) {
-    console.log('\nInstall the missing tools above, then run this again.\n');
+    console.log('\nInstall or upgrade the tools above, then run this again.\n');
     process.exit(1);
 }
 
@@ -117,9 +142,36 @@ if (existsSync(join(ROOT, 'node_modules', 'esbuild'))) {
 
 // ---------------------------------------------------------------------------
 
-log.step('Mailpit binary');
+log.step('Electron runtime');
 
-run('node', [join('scripts', 'fetch-mailpit.mjs')], { optional: true });
+// Electron's npm package is a thin wrapper; the actual runtime is downloaded
+// by its postinstall script, which writes dist/ plus a path.txt naming the
+// executable inside it. That script can be skipped (ignore-scripts, or npm
+// not re-running it on an already-installed package) and the install still
+// exits 0 — the failure only shows up when native:run can't find the binary.
+// Electron's own install.js is the same download, so run it directly.
+const electronPkg = join(ROOT, 'vendor', 'nativephp', 'desktop', 'resources', 'electron', 'node_modules', 'electron');
+
+function electronBinaryPresent() {
+    const pathFile = join(electronPkg, 'path.txt');
+    if (!existsSync(pathFile)) return false;
+    return existsSync(join(electronPkg, 'dist', readFileSync(pathFile, 'utf8').trim()));
+}
+
+if (!existsSync(electronPkg)) {
+    log.skip('Electron dependencies not installed yet — `composer native:dev:deps` installs them on first run');
+} else if (electronBinaryPresent()) {
+    log.ok('Electron binary present');
+} else {
+    log.warn('Electron package is installed but its binary is missing — downloading it');
+    // Relative to cwd on purpose: run() goes through a shell on Windows, and an
+    // absolute path under a profile with a space in it would split apart.
+    if (run('node', ['install.js'], { cwd: electronPkg }) && electronBinaryPresent()) {
+        log.ok('Electron binary downloaded');
+    } else {
+        log.fail('Could not download the Electron binary. Retry with: node vendor/nativephp/desktop/resources/electron/node_modules/electron/install.js');
+    }
+}
 
 // ---------------------------------------------------------------------------
 

@@ -22,6 +22,9 @@ class ConsoleController extends Controller
                 'editor' => $settings->editor,
                 'notifyErrors' => (bool) $settings->notify_errors,
                 'logShell' => $settings->log_shell ?? LogTailCommand::DEFAULT_STRATEGY,
+                'mailUrl' => $settings->mail_url,
+                'mailPin' => $settings->mail_pin,
+                'mailpitMode' => $settings->mailpit_mode ?? 'off',
             ],
             // Drives the Windows-only bits of the UI (log-shell picker, modifier
             // key glyphs). The renderer can't tell what OS it's on reliably.

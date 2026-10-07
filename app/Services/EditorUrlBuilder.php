@@ -35,7 +35,16 @@ class EditorUrlBuilder
     private function toUrlPath(string $file): string
     {
         $path = str_replace('\\', '/', $file);
+        $path = str_starts_with($path, '/') ? $path : '/'.$path;
 
-        return str_starts_with($path, '/') ? $path : '/'.$path;
+        // File paths come out of log text, which can carry user input. Encode
+        // each segment so a "?" or "#" in a path can't turn into URL query or
+        // fragment syntax for the editor's handler. The drive colon stays.
+        $segments = array_map(
+            fn (string $segment) => str_replace('%3A', ':', rawurlencode($segment)),
+            explode('/', $path),
+        );
+
+        return implode('/', $segments);
     }
 }
