@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import Sidebar from '../Components/Sidebar.vue';
 import SettingsModal from '../Components/SettingsModal.vue';
@@ -8,7 +8,7 @@ import Toolbar from '../Components/Toolbar.vue';
 import Output from '../Components/Output.vue';
 import StatusBar from '../Components/StatusBar.vue';
 import { deleteJson, getJson, postJson } from '../lib/http.js';
-import { onChildProcessExit, onChildProcessMessage } from '../lib/nativeEvents.js';
+import { onChildProcessExit, onChildProcessMessage, onNotificationClicked } from '../lib/nativeEvents.js';
 import { watchTinkerRun } from '../lib/tinkerRun.js';
 
 // Lazy-loaded so the CodeMirror editor (the bundle's heaviest dependency) and
@@ -31,9 +31,10 @@ const historyOpen = ref(false);
 // its own destination in the sidebar rather than a tab of the project view.
 const view = ref('project'); // project | mail
 const activeTab = ref('tinker'); // tinker | logs (within the project view)
-// The inbox mounts on first visit and then stays alive (hidden) so its live
-// connection keeps the sidebar's unread badge current.
-const mailVisited = ref(false);
+// The inbox is mounted from launch and stays alive (hidden) so its live
+// connection keeps the unread badge current and new mail can notify even
+// before Mail was ever opened.
+const mailInbox = ref(null);
 const unread = ref(0);
 const layout = ref('vertical'); // vertical (stacked) | horizontal (side-by-side)
 const running = ref(false);
@@ -136,8 +137,16 @@ function requestError(status, data) {
 
 function showMail() {
     view.value = 'mail';
-    mailVisited.value = true;
 }
+
+// A click on a new-mail notification: AppServiceProvider brings the window
+// forward; here, open the message it was about.
+const stopNotificationClicks = onNotificationClicked((reference) => {
+    if (!reference.startsWith('nexus-mail:')) return;
+    showMail();
+    mailInbox.value?.select(reference.slice('nexus-mail:'.length));
+});
+onBeforeUnmount(stopNotificationClicks);
 
 // Restore = load into the buffer and show it; running stays a deliberate ⌘↵.
 function restoreRun(run) {
@@ -202,8 +211,10 @@ function restoreRun(run) {
                 <LogViewer v-else :active-project="activeProject" :settings="settings" />
             </div>
 
-            <div v-if="mailVisited" v-show="view === 'mail'" class="flex min-h-0 flex-1 flex-col">
+            <div v-show="view === 'mail'" class="flex min-h-0 flex-1 flex-col">
                 <MailInbox
+                    ref="mailInbox"
+                    :notify="settings.notifyMail ?? true"
                     :settings-key="[settings.mailUrl, settings.mailPin, settings.mailpitMode].join('|')"
                     @unread="unread = $event"
                     @open-settings="settingsOpen = true"

@@ -21,6 +21,7 @@ class ConsoleController extends Controller
                 'phpPath' => $settings->php_path,
                 'editor' => $settings->editor,
                 'notifyErrors' => (bool) $settings->notify_errors,
+                'notifyMail' => (bool) ($settings->notify_mail ?? true),
                 'logShell' => $settings->log_shell ?? LogTailCommand::DEFAULT_STRATEGY,
                 'mailUrl' => $settings->mail_url,
                 'mailPin' => $settings->mail_pin,

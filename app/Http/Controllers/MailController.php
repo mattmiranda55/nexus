@@ -10,7 +10,9 @@ use App\Services\Mail\MailCatchers;
 use App\Services\MailpitAutostart;
 use App\Services\MailpitManager;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Native\Desktop\Facades\ChildProcess;
+use Native\Desktop\Facades\Notification;
 
 /**
  * Email hub. The inbox reads from whichever mail catcher is already running on
@@ -25,6 +27,9 @@ class MailController extends Controller
 {
     /** The ChildProcess relaying the catcher's live events (scripts/mail-watch.mjs). */
     public const WATCH_ALIAS = 'mail-watch';
+
+    /** Notification references for new mail: this prefix + the message id. */
+    public const NOTIFICATION_PREFIX = 'nexus-mail:';
 
     public function __construct(
         private MailCatchers $catchers,
@@ -119,6 +124,42 @@ class MailController extends Controller
 
             return ['ok' => true];
         });
+    }
+
+    /**
+     * Desktop notification for newly arrived mail. The renderer decides when
+     * (new messages while the window isn't focused); this owns the native
+     * hand-off. The reference carries the message id, so a click can open it
+     * (see AppServiceProvider and Console.vue).
+     */
+    public function notify(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'count' => 'required|integer|min:1|max:10000',
+            'id' => 'required|string|max:200',
+            'subject' => 'nullable|string|max:300',
+            'from' => 'nullable|string|max:300',
+        ]);
+
+        if (! (Setting::current()->notify_mail ?? true)) {
+            return response()->json(['status' => 'disabled']);
+        }
+
+        $subject = trim((string) ($data['subject'] ?? '')) ?: '(no subject)';
+        [$title, $body] = $data['count'] > 1
+            ? ["{$data['count']} new emails", "Latest: {$subject}"]
+            : ['New email'.(($data['from'] ?? '') !== '' ? " from {$data['from']}" : ''), $subject];
+
+        try {
+            Notification::title($title)
+                ->message($body)
+                ->reference(self::NOTIFICATION_PREFIX.$this->safeId($data['id']))
+                ->show();
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['status' => 'sent']);
     }
 
     /** One-click "connect this app": point a project's .env at the active catcher. */

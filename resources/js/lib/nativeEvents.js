@@ -6,6 +6,7 @@
 const MESSAGE = 'Native\\Desktop\\Events\\ChildProcess\\MessageReceived';
 const EXITED = 'Native\\Desktop\\Events\\ChildProcess\\ProcessExited';
 const STARTUP_ERROR = 'Native\\Desktop\\Events\\ChildProcess\\StartupError';
+const NOTIFICATION_CLICKED = 'Native\\Desktop\\Events\\Notifications\\NotificationClicked';
 
 const subscribers = new Map(); // event -> Set of handlers
 // An event is marked as soon as its registration is under way — not when it
@@ -33,11 +34,12 @@ function ensureRegistered(event) {
     else window.addEventListener('native:init', bind, { once: true });
 }
 
+// alias null = every payload of this event.
 function subscribe(event, alias, callback) {
     ensureRegistered(event);
 
     const sub = (payload) => {
-        if (payload?.alias === alias) callback(payload);
+        if (alias === null || payload?.alias === alias) callback(payload);
     };
     if (!subscribers.has(event)) subscribers.set(event, new Set());
     subscribers.get(event).add(sub);
@@ -65,6 +67,14 @@ export function onChildProcessExit(alias, callback) {
     ];
 
     return () => stops.forEach((stop) => stop());
+}
+
+/**
+ * Subscribe to clicks on OS notifications; the callback gets the reference
+ * the notification was shown with. Returns an unsubscribe function.
+ */
+export function onNotificationClicked(callback) {
+    return subscribe(NOTIFICATION_CLICKED, null, (payload) => callback(payload?.reference ?? ''));
 }
 
 export function nativeAvailable() {

@@ -10,12 +10,14 @@
 // (scripts/mail-watch.mjs); outside the desktop app it falls back to polling.
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { postJson, getJson, deleteJson } from '../lib/http.js';
-import { onChildProcessMessage } from '../lib/nativeEvents.js';
+import { nativeAvailable, onChildProcessMessage } from '../lib/nativeEvents.js';
+import { createArrivalTracker, notificationFor } from '../lib/newMail.js';
 
 const props = defineProps({
     // Changes whenever a mail-related setting does (URL, pin, Mailpit mode),
     // which means the server in use may have changed: re-detect.
     settingsKey: { type: String, default: '' },
+    notify: { type: Boolean, default: true }, // Settings → "notify me about new mail"
 });
 
 const emit = defineEmits(['unread', 'open-settings']);
@@ -38,6 +40,7 @@ const bodyTab = ref('html');
 let pollTimer = null;
 let refreshTimer = null;
 let stopWatching = null;
+const arrivals = createArrivalTracker();
 // Bumped on every init() and on unmount. Each async step checks it after
 // awaiting, so a startup loop from a previous init (or an unmounted
 // component) stops instead of wiring up a second watcher and poller.
@@ -67,6 +70,8 @@ async function init() {
     notice.value = '';
     clearSelection();
     messages.value = [];
+    // A different server (or a restart) isn't "new mail".
+    arrivals.reset();
 
     const ok = await fetchStatus();
     if (run !== generation) return;
@@ -90,9 +95,18 @@ async function loadMessages() {
     if (ok) {
         messages.value = data?.messages ?? [];
         loadError.value = '';
+        announce(arrivals.update(messages.value));
     } else {
         loadError.value = data?.error ?? 'Couldn\'t load the inbox.';
     }
+}
+
+// A desktop notification for mail that arrived while Nexus isn't focused —
+// hidden, minimized, or behind another window. In front, the list and the
+// sidebar badge already say it.
+function announce(fresh) {
+    if (!fresh.length || !props.notify || !nativeAvailable() || document.hasFocus()) return;
+    postJson('/mail/notify', notificationFor(fresh));
 }
 
 function clearSelection() {
@@ -266,6 +280,9 @@ function openMailpitSite() {
 }
 
 watch(() => props.settingsKey, init, { immediate: true });
+
+// Lets the page open a message from a notification click.
+defineExpose({ select });
 watch(unreadCount, (count) => emit('unread', count), { immediate: true });
 watch(bodyTab, (tab) => tab === 'source' && loadSource());
 onBeforeUnmount(() => {

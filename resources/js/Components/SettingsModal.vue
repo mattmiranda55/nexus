@@ -18,6 +18,7 @@ const form = useForm({
     notifyErrors: props.settings.notifyErrors ?? true,
     logShell: props.settings.logShell ?? 'gitbash',
     mailUrl: props.settings.mailUrl ?? '',
+    notifyMail: props.settings.notifyMail ?? true,
     mailPin: props.settings.mailPin ?? '',
     mailpitMode: props.settings.mailpitMode ?? 'off',
 });
@@ -206,6 +207,11 @@ function save() {
                             Automatic picks smtp4dev, then Mailpit, then MailHog.
                         </p>
                     </div>
+
+                    <label class="mt-3 flex items-center gap-2 text-sm">
+                        <input v-model="form.notifyMail" type="checkbox" class="rounded border-neutral-300 dark:border-neutral-700" />
+                        <span>Notify me about new mail when Nexus isn't in front</span>
+                    </label>
 
                     <div class="mt-3">
                         <label class="block text-xs font-medium text-neutral-500">Mail server URL (optional)</label>

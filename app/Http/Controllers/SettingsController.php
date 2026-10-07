@@ -18,6 +18,7 @@ class SettingsController extends Controller
             'phpPath' => 'nullable|string|max:1024',
             'editor' => 'required|in:phpstorm,vscode,vscodium,cursor,sublime,textmate',
             'notifyErrors' => 'boolean',
+            'notifyMail' => 'boolean',
             'logShell' => ['nullable', Rule::in(LogTailCommand::STRATEGIES)],
             // http(s) only: MailController fetches this URL server-side.
             'mailUrl' => 'nullable|url:http,https|max:2048',
@@ -31,6 +32,7 @@ class SettingsController extends Controller
             'php_path' => ($data['phpPath'] ?? null) ?: null,
             'editor' => $data['editor'],
             'notify_errors' => $data['notifyErrors'] ?? false,
+            'notify_mail' => $data['notifyMail'] ?? true,
             'log_shell' => $data['logShell'] ?? LogTailCommand::DEFAULT_STRATEGY,
             'mail_url' => rtrim((string) ($data['mailUrl'] ?? ''), '/') ?: null,
             'mail_pin' => ($data['mailPin'] ?? null) ?: null,

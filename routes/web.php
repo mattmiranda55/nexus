@@ -33,6 +33,7 @@ Route::post('/links/{key}', [LinkController::class, 'open'])->where('key', '[a-z
 
 Route::post('/mail/status', [MailController::class, 'status'])->name('mail.status');
 Route::post('/mail/watch', [MailController::class, 'watch'])->name('mail.watch');
+Route::post('/mail/notify', [MailController::class, 'notify'])->name('mail.notify');
 Route::post('/mail/connect/{project}', [MailController::class, 'connect'])->name('mail.connect');
 Route::get('/mail/messages', [MailController::class, 'messages'])->name('mail.messages');
 Route::get('/mail/message/{id}', [MailController::class, 'message'])->name('mail.message');
