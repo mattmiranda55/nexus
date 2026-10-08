@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\Setting;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Native\Desktop\Dialog;
 
@@ -64,6 +66,19 @@ class ProjectController extends Controller
         Setting::current()->update(['active_project_id' => $project->id]);
 
         return to_route('console');
+    }
+
+    /**
+     * Save the project's tinker editor contents. The editor debounces this, so
+     * it's one small write after typing pauses, not one per keystroke.
+     */
+    public function scratch(Request $request, Project $project): JsonResponse
+    {
+        $data = $request->validate(['code' => 'present|nullable|string|max:1000000']);
+
+        $project->update(['scratch' => $data['code']]);
+
+        return response()->json(['ok' => true]);
     }
 
     public function destroy(Project $project): RedirectResponse

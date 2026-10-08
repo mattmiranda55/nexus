@@ -15,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(EnsureLoopbackHost::class);
 
+        // Code is sent verbatim: trimming would eat a saved buffer's trailing
+        // newline and leading indentation (tinker runs and scratch saves).
+        $middleware->trimStrings(except: ['code']);
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
         ]);

@@ -12,6 +12,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { postJson, getJson, deleteJson } from '../lib/http.js';
 import { nativeAvailable, onChildProcessMessage } from '../lib/nativeEvents.js';
 import { createArrivalTracker, notificationFor } from '../lib/newMail.js';
+import { projectFor, senderIndex } from '../lib/mailSenders.js';
 
 const props = defineProps({
     // Changes whenever a mail-related setting does (URL, pin, Mailpit mode),
@@ -36,6 +37,10 @@ const selectedId = ref(null);
 const detail = ref(null);
 const sourceText = ref(null);
 const bodyTab = ref('html');
+// Preview HTML mail at phone width (most Laravel mail is read on phones).
+const mobilePreview = ref(false);
+// Filter the list to one sending project ('' = all, '?' = unmatched).
+const projectFilter = ref('');
 
 let pollTimer = null;
 let refreshTimer = null;
@@ -52,6 +57,20 @@ const active = computed(() => status.value.active);
 const wireable = computed(() => status.value.projects.filter((p) => p.hasEnv));
 const wiredCount = computed(() => wireable.value.filter((p) => p.connected).length);
 const unreadCount = computed(() => messages.value.filter((m) => !m.read).length);
+
+// Tag each message with the project that sent it (by MAIL_FROM_ADDRESS).
+const senders = computed(() => senderIndex(status.value.projects));
+const tagged = computed(() => messages.value.map((msg) => ({ msg, project: projectFor(msg, senders.value) })));
+const sendingProjects = computed(() => [...new Set(tagged.value.map((t) => t.project).filter(Boolean))].sort());
+const visibleMessages = computed(() =>
+    projectFilter.value === ''
+        ? tagged.value
+        : tagged.value.filter((t) => (projectFilter.value === '?' ? !t.project : t.project === projectFilter.value)),
+);
+// A filter for a project with no mail left (cleared inbox) resets itself.
+watch(sendingProjects, (names) => {
+    if (projectFilter.value && projectFilter.value !== '?' && !names.includes(projectFilter.value)) projectFilter.value = '';
+});
 
 function hostOf(url) {
     return (url ?? '').replace(/^https?:\/\//, '');
@@ -429,6 +448,17 @@ onBeforeUnmount(() => {
         <div v-else class="flex min-h-0 flex-1">
             <!-- List -->
             <div class="w-72 shrink-0 overflow-auto border-r border-neutral-200 dark:border-neutral-800">
+                <div v-if="sendingProjects.length" class="border-b border-neutral-200 px-2 py-1.5 dark:border-neutral-800">
+                    <select
+                        v-model="projectFilter"
+                        class="w-full rounded border border-neutral-300 bg-transparent px-1.5 py-0.5 text-[11px] dark:border-neutral-700"
+                        title="Show mail from one project (matched by its MAIL_FROM_ADDRESS)"
+                    >
+                        <option value="">All projects</option>
+                        <option v-for="name in sendingProjects" :key="name" :value="name">{{ name }}</option>
+                        <option value="?">Other senders</option>
+                    </select>
+                </div>
                 <div v-if="loadError" class="p-4 text-center text-xs text-red-500">
                     {{ loadError }}
                     <button type="button" class="ml-1 underline" @click="init">Check again</button>
@@ -436,8 +466,11 @@ onBeforeUnmount(() => {
                 <div v-else-if="!messages.length" class="p-4 text-center text-xs text-neutral-400">
                     No mail yet. Anything sent to {{ active?.smtpHost }}:{{ active?.smtpPort }} shows up here.
                 </div>
+                <div v-else-if="!visibleMessages.length" class="p-4 text-center text-xs text-neutral-400">
+                    No mail from {{ projectFilter === '?' ? 'other senders' : projectFilter }}.
+                </div>
                 <button
-                    v-for="msg in messages"
+                    v-for="{ msg, project } in visibleMessages"
                     :key="msg.id"
                     type="button"
                     class="block w-full border-b border-neutral-100 px-3 py-2 text-left dark:border-neutral-900"
@@ -449,7 +482,14 @@ onBeforeUnmount(() => {
                         <span class="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">{{ msg.subject || '(no subject)' }}</span>
                         <span class="ml-auto shrink-0 text-[10px] text-neutral-400">{{ when(msg.date) }}</span>
                     </div>
-                    <div class="mt-0.5 truncate text-[11px] text-neutral-500">{{ nameOf(msg.from) }}</div>
+                    <div class="mt-0.5 flex items-center gap-1.5 text-[11px] text-neutral-500">
+                        <span class="truncate">{{ nameOf(msg.from) }}</span>
+                        <span
+                            v-if="project"
+                            class="ml-auto shrink-0 rounded bg-neutral-200 px-1.5 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                            :title="`Sent by ${project} (matched by its MAIL_FROM_ADDRESS)`"
+                        >{{ project }}</span>
+                    </div>
                     <div v-if="msg.snippet" class="truncate text-[11px] text-neutral-400">{{ msg.snippet }}</div>
                 </button>
             </div>
@@ -478,6 +518,22 @@ onBeforeUnmount(() => {
                             >
                                 {{ t.label }}
                             </button>
+                            <button
+                                v-if="bodyTab === 'html'"
+                                type="button"
+                                class="ml-auto flex items-center gap-1 rounded border px-2 py-0.5 text-xs"
+                                :class="mobilePreview
+                                    ? 'border-sky-400 bg-sky-50 text-sky-800 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-200'
+                                    : 'border-neutral-300 text-neutral-500 dark:border-neutral-700'"
+                                :aria-pressed="mobilePreview"
+                                :title="mobilePreview ? 'Back to full width' : 'Preview at phone width (375px)'"
+                                @click="mobilePreview = !mobilePreview"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M5 3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V3Zm4 13a1 1 0 1 0 2 0 1 1 0 0 0-2 0Z" clip-rule="evenodd" />
+                                </svg>
+                                Phone width
+                            </button>
                             <span
                                 v-if="detail.attachments?.length"
                                 class="ml-2 self-center truncate text-[11px] text-neutral-400"
@@ -489,12 +545,18 @@ onBeforeUnmount(() => {
                     </div>
 
                     <div class="min-h-0 flex-1 overflow-auto">
-                        <iframe
+                        <div
                             v-if="bodyTab === 'html'"
-                            :srcdoc="detail.html"
-                            sandbox=""
-                            class="h-full w-full border-0 bg-white"
-                        ></iframe>
+                            class="h-full"
+                            :class="mobilePreview ? 'flex justify-center bg-neutral-200 py-4 dark:bg-neutral-900' : ''"
+                        >
+                            <iframe
+                                :srcdoc="detail.html"
+                                sandbox=""
+                                class="h-full border-0 bg-white"
+                                :class="mobilePreview ? 'w-[375px] rounded-lg shadow-lg ring-1 ring-black/10' : 'w-full'"
+                            ></iframe>
+                        </div>
                         <pre v-else-if="bodyTab === 'text'" class="whitespace-pre-wrap break-words p-3 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ detail.text || '(no text part)' }}</pre>
                         <pre v-else class="whitespace-pre-wrap break-words p-3 font-mono text-xs text-neutral-500">{{ sourceText ?? 'Loading…' }}</pre>
                     </div>

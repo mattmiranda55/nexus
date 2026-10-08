@@ -196,3 +196,25 @@ export function levelStyle(level) {
     if (l === 'debug') return { dot: 'bg-sky-500', text: 'text-sky-500' };
     return { dot: 'bg-neutral-500', text: 'text-neutral-500' };
 }
+
+/**
+ * The time span a set of log entries covers, as {from, to} timestamps — used
+ * to show a tinker run's entries in the full log viewer. Null when none of
+ * the entries carry a timestamp.
+ */
+export function timeWindow(entries) {
+    const stamps = entries.map((e) => e.timestamp).filter(Boolean).sort();
+    return stamps.length ? { from: stamps[0], to: stamps[stamps.length - 1] } : null;
+}
+
+/**
+ * Whether an entry falls inside a timeWindow(). Laravel's "Y-m-d H:i:s"
+ * timestamps sort as strings, which keeps this timezone-free: both sides come
+ * from the same log. Seconds granularity, so neighbours logged in the same
+ * seconds show too.
+ */
+export function inTimeWindow(entry, window) {
+    if (!window) return true;
+    const t = entry.timestamp ?? '';
+    return t !== '' && t >= window.from && t <= window.to;
+}

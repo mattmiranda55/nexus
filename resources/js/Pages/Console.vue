@@ -7,7 +7,8 @@ import HistoryModal from '../Components/HistoryModal.vue';
 import Toolbar from '../Components/Toolbar.vue';
 import Output from '../Components/Output.vue';
 import StatusBar from '../Components/StatusBar.vue';
-import { deleteJson, getJson, postJson } from '../lib/http.js';
+import { deleteJson, getJson, postJson, sendJson } from '../lib/http.js';
+import { createScratchSaver } from '../lib/scratchSaver.js';
 import { onChildProcessExit, onChildProcessMessage, onNotificationClicked } from '../lib/nativeEvents.js';
 import { watchTinkerRun } from '../lib/tinkerRun.js';
 
@@ -50,6 +51,45 @@ const DEFAULT_CODE = "// Explore your app — Cmd/Ctrl+Enter to run\nUser::count
 const buffers = ref({}); // projectId -> editor contents
 const outputs = ref({}); // projectId -> { envelope, raw }
 
+// Buffers are saved per project (debounced) and restored on launch, so a
+// session built up over the day survives quitting Nexus.
+let closing = false;
+const scratch = createScratchSaver((id, value) =>
+    sendJson('PUT', `/projects/${id}/scratch`, { code: value }, { keepalive: closing }).catch(() => {}),
+);
+
+// Seed from the server without clobbering edits made since (the page props
+// are re-sent on every project switch).
+watch(
+    () => props.projects,
+    (projects) => {
+        for (const p of projects) {
+            if (!(p.id in buffers.value) && p.scratch != null) buffers.value[p.id] = p.scratch;
+        }
+    },
+    { immediate: true },
+);
+
+function flushScratch() {
+    scratch.flush();
+}
+function onHide() {
+    if (document.visibilityState === 'hidden') flushScratch();
+}
+function onUnload() {
+    closing = true;
+    flushScratch();
+}
+window.addEventListener('blur', flushScratch);
+window.addEventListener('beforeunload', onUnload);
+document.addEventListener('visibilitychange', onHide);
+onBeforeUnmount(() => {
+    flushScratch();
+    window.removeEventListener('blur', flushScratch);
+    window.removeEventListener('beforeunload', onUnload);
+    document.removeEventListener('visibilitychange', onHide);
+});
+
 // Keys the buffer maps; falls back to a shared slot when no project is active.
 function bufferKey(id) {
     return id ?? '_none';
@@ -59,6 +99,7 @@ const code = computed({
     get: () => buffers.value[bufferKey(props.activeProjectId)] ?? DEFAULT_CODE,
     set: (value) => {
         buffers.value[bufferKey(props.activeProjectId)] = value;
+        scratch.schedule(props.activeProjectId, value);
     },
 });
 
@@ -81,7 +122,9 @@ watch(() => props.settings.theme, applyTheme);
 
 const flashError = computed(() => page.props.flash?.error);
 
-async function runTinker() {
+// `selection`: the editor's selected text when ⌘↵ was pressed over one;
+// otherwise (or from the Run button) the whole buffer runs.
+async function runTinker(selection = null) {
     if (running.value || !activeProject.value) return;
 
     // Pin the target project so a mid-run project switch writes the result to
@@ -99,7 +142,7 @@ async function runTinker() {
         onExit: onChildProcessExit,
     });
     try {
-        let { ok, status, data } = await postJson('/tinker', { code: code.value, id });
+        let { ok, status, data } = await postJson('/tinker', { code: typeof selection === 'string' ? selection : code.value, id });
         if (status === 202) {
             stoppable.value = { id, watcher };
             ({ ok, status, data } = await watcher.result());
@@ -108,6 +151,7 @@ async function runTinker() {
             envelope: data?.envelope ?? null,
             raw: data?.raw ?? data?.output ?? (ok ? '(no output)' : requestError(status, data)),
             logged: data?.loggedDuringRun ?? null,
+            durationMs: data?.durationMs ?? null,
         };
     } catch (e) {
         outputs.value[key] = { envelope: null, raw: 'Error: ' + e.message, logged: null };
@@ -134,6 +178,19 @@ function requestError(status, data) {
     const message = data?.message ?? data?.error;
     return `Error: the run request failed (HTTP ${status})${message ? ` — ${message}` : ''}`;
 }
+
+// "Show in Logs" on a run: the Logs tab, filtered to when that run logged.
+const logFocus = ref(null);
+function showRunInLogs(span) {
+    logFocus.value = span;
+    view.value = 'project';
+    activeTab.value = 'logs';
+}
+// The filter belongs to that one look; going elsewhere drops it.
+watch(activeTab, (tab) => {
+    if (tab !== 'logs') logFocus.value = null;
+});
+watch(() => props.activeProjectId, () => (logFocus.value = null));
 
 function showMail() {
     view.value = 'mail';
@@ -203,12 +260,18 @@ function restoreRun(run) {
                             class="min-h-0 min-w-0"
                             :class="layout === 'vertical' ? 'h-2/5' : 'w-2/5'"
                         >
-                            <Output :result="output" :running="running" />
+                            <Output :result="output" :running="running" @show-in-logs="showRunInLogs" />
                         </div>
                     </div>
                 </template>
 
-                <LogViewer v-else :active-project="activeProject" :settings="settings" />
+                <LogViewer
+                    v-else
+                    :active-project="activeProject"
+                    :settings="settings"
+                    :focus="logFocus"
+                    @clear-focus="logFocus = null"
+                />
             </div>
 
             <div v-show="view === 'mail'" class="flex min-h-0 flex-1 flex-col">

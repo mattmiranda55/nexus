@@ -23,7 +23,7 @@ class EnvWriter
 
         $contents = (string) file_get_contents($path);
         $values = [];
-        foreach (['MAIL_MAILER', 'MAIL_HOST', 'MAIL_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD'] as $key) {
+        foreach (['MAIL_MAILER', 'MAIL_HOST', 'MAIL_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD', 'MAIL_FROM_ADDRESS'] as $key) {
             $values[$key] = $this->read($contents, $key);
         }
 

@@ -1,13 +1,17 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, triggerRef, watch } from 'vue';
-import { createLogAccumulator, levelStyle } from '../lib/logParser.js';
+import { createLogAccumulator, inTimeWindow, levelStyle } from '../lib/logParser.js';
 import { postJson } from '../lib/http.js';
 import { nativeAvailable, onChildProcessMessage } from '../lib/nativeEvents.js';
 
 const props = defineProps({
     activeProject: { type: Object, default: null },
     settings: { type: Object, default: () => ({ notifyErrors: true }) },
+    // {from, to}: only show entries logged in this span (a tinker run's).
+    focus: { type: Object, default: null },
 });
+
+const emit = defineEmits(['clear-focus']);
 
 const SEVERE = ['emergency', 'alert', 'critical', 'error'];
 
@@ -59,6 +63,7 @@ const presentLevels = computed(() => [...new Set(entries.value.map((e) => e.leve
 
 const filtered = computed(() =>
     entries.value.filter((entry) => {
+        if (!inTimeWindow(entry, props.focus)) return false;
         if (activeLevels.value.size && !activeLevels.value.has(entry.level)) return false;
         const q = search.value.trim().toLowerCase();
         if (q) {
@@ -213,6 +218,15 @@ function clear() {
     pinned.value = true;
 }
 
+// Truncate laravel.log itself, then the view: the tail keeps following the
+// (now empty) file, so whatever happens next starts from a clean slate.
+async function clearFile() {
+    if (!window.confirm(`Empty ${logPath.value || 'laravel.log'}? This deletes its contents.`)) return;
+    const { ok, data } = await postJson('/logs/clear');
+    if (ok) clear();
+    else window.alert(data?.error ?? 'Couldn\'t empty the log file.');
+}
+
 function toggleLevel(level) {
     const next = new Set(activeLevels.value);
     next.has(level) ? next.delete(level) : next.add(level);
@@ -305,14 +319,34 @@ onBeforeUnmount(() => {
                 </button>
             </div>
 
+            <button
+                v-if="focus"
+                type="button"
+                class="flex items-center gap-1 rounded bg-sky-100 px-2 py-0.5 text-[11px] text-sky-800 hover:bg-sky-200 dark:bg-sky-900/50 dark:text-sky-200"
+                :title="`${focus.from} – ${focus.to}`"
+                @click="emit('clear-focus')"
+            >
+                Only the run's entries ✕
+            </button>
+
             <span class="text-[10px] text-neutral-400">{{ rows.length }} entries</span>
 
             <button
                 type="button"
                 class="rounded px-2 py-0.5 text-xs text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                title="Clear this view (the file is untouched)"
                 @click="clear"
             >
                 Clear
+            </button>
+            <button
+                v-if="status === 'live'"
+                type="button"
+                class="rounded px-2 py-0.5 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                :title="`Empty ${logPath}`"
+                @click="clearFile"
+            >
+                Empty log file
             </button>
         </div>
 

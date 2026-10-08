@@ -80,6 +80,35 @@ class LogController extends Controller
         ]);
     }
 
+    /**
+     * Empty the active project's laravel.log — the "clear, reproduce, read"
+     * loop without a trip to the terminal. Truncated in place rather than
+     * deleted, so the running tail (and the app's own handle) keep working.
+     */
+    public function clear(): JsonResponse
+    {
+        $activeId = Setting::current()->active_project_id;
+        $project = $activeId ? Project::find($activeId) : null;
+
+        if (! $project) {
+            return response()->json(['error' => 'No project selected'], 422);
+        }
+
+        $path = file_exists($project->logPath()) ? $project->logPath() : $project->legacyLogPath();
+
+        if (! is_file($path)) {
+            return response()->json(['error' => 'No log file at '.$path], 404);
+        }
+
+        $handle = @fopen($path, 'r+');
+        if ($handle === false || ! ftruncate($handle, 0)) {
+            return response()->json(['error' => 'Couldn\'t clear '.$path], 500);
+        }
+        fclose($handle);
+
+        return response()->json(['ok' => true, 'path' => $path]);
+    }
+
     public function stop(): JsonResponse
     {
         $this->stopTail();

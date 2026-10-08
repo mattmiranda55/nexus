@@ -95,6 +95,7 @@ const runKey = computed(() => (props.platform === 'Darwin' ? '⌘↵' : 'Ctrl+�
         <span
             class="text-xs text-neutral-400"
             :class="activeTab === 'tinker' ? '' : 'ml-auto'"
+            :title="`${runKey} runs the selection, if there is one`"
         >{{ runKey }} to run</span>
     </div>
 </template>

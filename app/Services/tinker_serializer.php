@@ -45,12 +45,20 @@ if (! function_exists('nexus_serialize')) {
     /**
      * The full payload emitted between sentinels: the value envelope plus any
      * SQL captured via DB::enableQueryLog() during the run (folded in here so
-     * nexus_serialize() stays pure and unit-testable without a database).
+     * nexus_serialize() stays pure and unit-testable without a database), and
+     * how long the user's code took: $started is the hrtime() the preamble
+     * recorded just before it, so Laravel's boot isn't counted.
      */
-    function nexus_envelope($value): array
+    function nexus_envelope($value, $started = null): array
     {
+        $elapsed = is_int($started) ? hrtime(true) - $started : null;
+
         $env = nexus_serialize($value);
         $env['queries'] = nexus_queries();
+        $env['timing'] = [
+            'ms' => $elapsed === null ? null : round($elapsed / 1e6, 2),
+            'memoryPeak' => memory_get_peak_usage(true),
+        ];
 
         return $env;
     }

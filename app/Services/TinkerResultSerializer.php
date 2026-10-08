@@ -21,6 +21,9 @@ class TinkerResultSerializer
 
     public const END = '__NEXUS_OUT_END__';
 
+    /** Set by the preamble right before the user's code, for timing it. */
+    public const STARTED_VAR = '__nexusStarted';
+
     /**
      * PHP prepended to the piped stdin: defines the serializer (once) and turns
      * on query logging so runs can surface the SQL they triggered (Tier B4).
@@ -33,7 +36,9 @@ class TinkerResultSerializer
         $b64 = base64_encode($src);
 
         return "if (! function_exists('nexus_serialize')) { eval(base64_decode('{$b64}')); }\n"
-            ."try { \\DB::connection()->flushQueryLog(); \\DB::connection()->enableQueryLog(); } catch (\\Throwable \$e) {}\n";
+            ."try { \\DB::connection()->flushQueryLog(); \\DB::connection()->enableQueryLog(); } catch (\\Throwable \$e) {}\n"
+            // Last, so the timing covers only the user's code.
+            .'$'.self::STARTED_VAR." = hrtime(true);\n";
     }
 
     /**
@@ -46,7 +51,8 @@ class TinkerResultSerializer
         $flags = 'JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES '
             .'| JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE';
         $value = '$'.TinkerScript::RESULT_VAR.' ?? null';
+        $started = '$'.self::STARTED_VAR.' ?? null';
 
-        return 'echo "'.self::START.'".json_encode(nexus_envelope('.$value.'), '.$flags.')."'.self::END.'";'."\n";
+        return 'echo "'.self::START.'".json_encode(nexus_envelope('.$value.', '.$started.'), '.$flags.')."'.self::END.'";'."\n";
     }
 }

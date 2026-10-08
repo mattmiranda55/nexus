@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { createLogAccumulator, parseLogLine, parseFrame, buildParsedLogs, levelStyle } from './logParser.js';
+import { createLogAccumulator, parseLogLine, parseFrame, buildParsedLogs, levelStyle, timeWindow, inTimeWindow } from './logParser.js';
 
 test('parses a standard Laravel log header line', () => {
     const p = parseLogLine('[2026-07-19 12:00:00] local.ERROR: Boom');
@@ -163,4 +163,21 @@ test('maps levels to distinct colors', () => {
     expect(levelStyle('warning').text).toBe('text-amber-500');
     expect(levelStyle('info').text).toBe('text-emerald-500');
     expect(levelStyle('debug').text).toBe('text-sky-500');
+});
+
+test('timeWindow spans the earliest to the latest timestamp', () => {
+    const entries = buildParsedLogs(
+        '[2026-10-08 10:00:05] local.INFO: b\n[2026-10-08 10:00:01] local.ERROR: a\nstack line\n',
+    );
+    expect(timeWindow(entries)).toEqual({ from: '2026-10-08 10:00:01', to: '2026-10-08 10:00:05' });
+    expect(timeWindow([])).toBeNull();
+});
+
+test('inTimeWindow keeps entries inside the window, inclusive', () => {
+    const window = { from: '2026-10-08 10:00:01', to: '2026-10-08 10:00:05' };
+    expect(inTimeWindow({ timestamp: '2026-10-08 10:00:01' }, window)).toBe(true);
+    expect(inTimeWindow({ timestamp: '2026-10-08 10:00:05' }, window)).toBe(true);
+    expect(inTimeWindow({ timestamp: '2026-10-08 10:00:06' }, window)).toBe(false);
+    expect(inTimeWindow({ timestamp: '' }, window)).toBe(false);
+    expect(inTimeWindow({ timestamp: '' }, null)).toBe(true);
 });

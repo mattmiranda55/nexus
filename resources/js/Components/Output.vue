@@ -14,6 +14,8 @@ const props = defineProps({
     running: { type: Boolean, default: false },
 });
 
+const emit = defineEmits(['show-in-logs']);
+
 const STRUCTURED = ['list', 'assoc', 'collection', 'model', 'object'];
 
 const envelope = computed(() => props.result?.envelope ?? null);
@@ -22,6 +24,24 @@ const root = computed(() => envelope.value?.root ?? null);
 const table = computed(() => envelope.value?.table ?? null);
 const queries = computed(() => envelope.value?.queries ?? []);
 const meta = computed(() => envelope.value?.meta ?? null);
+
+// "42 ms": the user's code alone (timed inside the project); the tooltip adds
+// the whole run, which includes booting Laravel. A failed run has no envelope,
+// so only the whole-run time is known.
+const timing = computed(() => {
+    const codeMs = envelope.value?.timing?.ms;
+    const totalMs = props.result?.durationMs;
+    if (codeMs == null && totalMs == null) return null;
+
+    const fmt = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`);
+    const memory = envelope.value?.timing?.memoryPeak;
+    const parts = [];
+    if (codeMs != null) parts.push(`Your code: ${fmt(codeMs)}`);
+    if (totalMs != null) parts.push(`whole run incl. booting Laravel: ${fmt(totalMs)}`);
+    if (memory) parts.push(`peak memory: ${(memory / 1048576).toFixed(1)} MB`);
+
+    return { label: fmt(codeMs ?? totalMs), title: parts.join(' · ') };
+});
 
 const hasTree = computed(() => !!root.value && STRUCTURED.includes(root.value.kind));
 
@@ -64,8 +84,14 @@ watch(
                     {{ v.label }}
                 </button>
                 <span
+                    v-if="timing"
+                    class="ml-auto shrink-0 font-mono text-[11px] text-neutral-400"
+                    :title="timing.title"
+                >{{ timing.label }}</span>
+                <span
                     v-if="meta"
-                    class="ml-auto truncate rounded bg-neutral-100 px-2 py-0.5 font-mono text-[11px] text-neutral-500 dark:bg-neutral-900"
+                    :class="timing ? '' : 'ml-auto'"
+                    class="truncate rounded bg-neutral-100 px-2 py-0.5 font-mono text-[11px] text-neutral-500 dark:bg-neutral-900"
                     :title="meta.phpType"
                 >{{ meta.phpType }}</span>
             </div>
@@ -88,6 +114,6 @@ watch(
 
         <div v-else class="p-3 font-mono text-xs text-neutral-400">Output will appear here. Press ⌘↵ to run.</div>
 
-        <RunLogCorrelation v-if="!running && result?.logged" :text="result.logged" />
+        <RunLogCorrelation v-if="!running && result?.logged" :text="result.logged" @show-in-logs="emit('show-in-logs', $event)" />
     </div>
 </template>

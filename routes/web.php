@@ -16,6 +16,7 @@ Route::get('/', [ConsoleController::class, 'index'])->name('console');
 
 Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
 Route::post('/projects/{project}/activate', [ProjectController::class, 'activate'])->name('projects.activate');
+Route::put('/projects/{project}/scratch', [ProjectController::class, 'scratch'])->name('projects.scratch');
 Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
 
 Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
@@ -26,6 +27,7 @@ Route::delete('/tinker/{id}', [TinkerController::class, 'stop'])->whereUuid('id'
 
 Route::post('/logs/start', [LogController::class, 'start'])->name('logs.start');
 Route::post('/logs/stop', [LogController::class, 'stop'])->name('logs.stop');
+Route::post('/logs/clear', [LogController::class, 'clear'])->name('logs.clear');
 
 Route::post('/editor/open', [EditorController::class, 'open'])->name('editor.open');
 Route::post('/notify', [NotifyController::class, 'store'])->name('notify.store');

@@ -6,9 +6,11 @@ export function csrfToken() {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
-export async function sendJson(method, url, body = null) {
+export async function sendJson(method, url, body = null, { keepalive = false } = {}) {
     const init = {
         method,
+        // keepalive lets a request finish while the page is being closed.
+        keepalive,
         headers: {
             Accept: 'application/json',
             'X-XSRF-TOKEN': csrfToken(),

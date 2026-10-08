@@ -92,4 +92,17 @@ class ProjectsSettingsTest extends TestCase
         $this->assertDatabaseMissing('projects', ['id' => $project->id]);
         $this->assertNull(Setting::current()->active_project_id);
     }
+
+    public function test_a_projects_scratch_buffer_is_saved_and_sent_back_with_the_page(): void
+    {
+        $project = Project::create(['name' => 'demo', 'path' => base_path()]);
+
+        $this->putJson("/projects/{$project->id}/scratch", ['code' => "User::first();\n"])->assertOk();
+        $this->assertSame("User::first();\n", $project->fresh()->scratch);
+
+        $this->get('/')->assertInertia(fn ($page) => $page->where('projects.0.scratch', "User::first();\n"));
+
+        $this->putJson("/projects/{$project->id}/scratch", ['code' => ''])->assertOk();
+        $this->assertNull($project->fresh()->scratch, 'An emptied buffer is stored as empty');
+    }
 }

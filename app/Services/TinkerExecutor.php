@@ -20,7 +20,7 @@ class TinkerExecutor
         private LogDeltaReader $logs,
     ) {}
 
-    /** @return array{envelope: ?array, raw: string, output: string, loggedDuringRun: ?string} */
+    /** @return array{envelope: ?array, raw: string, output: string, loggedDuringRun: ?string, durationMs: int} */
     public function execute(Project $project, string $code): array
     {
         // A4 run↔log correlation: snapshot the log size, then read exactly what
@@ -30,6 +30,7 @@ class TinkerExecutor
 
         $started = hrtime(true);
         $result = $this->runner->runStructured($project->path, $code);
+        $durationMs = (int) ((hrtime(true) - $started) / 1_000_000);
 
         // Run history: an envelope means the code executed to completion and
         // produced a structured result; its absence means tinker bailed early
@@ -38,7 +39,7 @@ class TinkerExecutor
             $project->id,
             $code,
             $result['envelope'] !== null,
-            (int) ((hrtime(true) - $started) / 1_000_000),
+            $durationMs,
         );
 
         return [
@@ -47,6 +48,9 @@ class TinkerExecutor
             // Back-compat alias: the raw/CLI-parity view is the old `output`.
             'output' => $result['raw'],
             'loggedDuringRun' => $this->logs->read($logPath, $before),
+            // The whole run, Laravel's boot included; the envelope's timing
+            // has the user's code alone.
+            'durationMs' => $durationMs,
         ];
     }
 
@@ -58,6 +62,7 @@ class TinkerExecutor
             'raw' => 'Error: '.$message,
             'output' => 'Error: '.$message,
             'loggedDuringRun' => null,
+            'durationMs' => null,
         ];
     }
 }

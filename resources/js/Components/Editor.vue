@@ -28,12 +28,16 @@ onMounted(() => {
         state: EditorState.create({
             doc: props.modelValue,
             extensions: [
-                // Cmd/Ctrl+Enter runs the snippet (highest precedence).
+                // Cmd/Ctrl+Enter runs the snippet (highest precedence) — or
+                // just the selected text, when there is a selection, so one
+                // experiment in a busy buffer can be re-run on its own.
                 keymap.of([{
                     key: 'Mod-Enter',
                     preventDefault: true,
-                    run: () => {
-                        emit('run');
+                    run: (editor) => {
+                        const { from, to, empty } = editor.state.selection.main;
+                        const selected = empty ? '' : editor.state.sliceDoc(from, to);
+                        emit('run', selected.trim() ? selected : null);
                         return true;
                     },
                 }]),

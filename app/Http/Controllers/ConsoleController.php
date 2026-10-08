@@ -15,7 +15,7 @@ class ConsoleController extends Controller
         $settings = Setting::current();
 
         return Inertia::render('Console', [
-            'projects' => Project::orderBy('name')->get(['id', 'name', 'path']),
+            'projects' => Project::orderBy('name')->get(['id', 'name', 'path', 'scratch']),
             'settings' => [
                 'theme' => $settings->theme,
                 'phpPath' => $settings->php_path,

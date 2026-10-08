@@ -3,11 +3,13 @@
 // output. Reuses the log parser/level styling so a run that quietly logged a
 // warning or exception surfaces right next to its result.
 import { computed, ref } from 'vue';
-import { buildParsedLogs, levelStyle } from '../lib/logParser.js';
+import { buildParsedLogs, levelStyle, timeWindow } from '../lib/logParser.js';
 
 const props = defineProps({
     text: { type: String, default: '' },
 });
+
+const emit = defineEmits(['show-in-logs']);
 
 const open = ref(false);
 const entries = computed(() => buildParsedLogs(props.text));
@@ -15,6 +17,8 @@ const entries = computed(() => buildParsedLogs(props.text));
 const SEVERE = ['emergency', 'alert', 'critical', 'error'];
 const errorCount = computed(() => entries.value.filter((e) => SEVERE.includes(e.level)).length);
 const hasErrors = computed(() => errorCount.value > 0);
+// Where this run's entries sit in the full log, for "Show in Logs".
+const span = computed(() => timeWindow(entries.value));
 </script>
 
 <template>
@@ -29,7 +33,18 @@ const hasErrors = computed(() => errorCount.value > 0);
                 This run logged {{ entries.length }} {{ entries.length === 1 ? 'entry' : 'entries' }}
                 <span v-if="hasErrors">· {{ errorCount }} error{{ errorCount === 1 ? '' : 's' }}</span>
             </span>
-            <span class="ml-auto text-neutral-400">{{ open ? '▾' : '▸' }}</span>
+            <span class="ml-auto flex items-center gap-2">
+                <span
+                    v-if="span"
+                    role="button"
+                    tabindex="0"
+                    class="rounded px-1.5 py-0.5 text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
+                    title="Open the Logs tab filtered to when this run logged"
+                    @click.stop="emit('show-in-logs', span)"
+                    @keydown.enter.stop="emit('show-in-logs', span)"
+                >Show in Logs</span>
+                <span class="text-neutral-400">{{ open ? '▾' : '▸' }}</span>
+            </span>
         </button>
 
         <div v-if="open" class="max-h-40 overflow-auto border-t border-black/5 px-3 py-1 font-mono dark:border-white/5">

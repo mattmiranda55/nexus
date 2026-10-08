@@ -233,12 +233,16 @@ class MailController extends Controller
     {
         return Project::orderBy('name')->get()->map(function (Project $project) use ($catcher) {
             $mail = $this->env->mailStatus($project->path, $catcher->smtpPort());
+            $from = strtolower(trim((string) ($mail['values']['MAIL_FROM_ADDRESS'] ?? '')));
 
             return [
                 'id' => $project->id,
                 'name' => $project->name,
                 'hasEnv' => $mail['exists'],
                 'connected' => $mail['connected'],
+                // Lets the inbox tag mail with the project that sent it. A
+                // value built from other variables (${…}) can't be matched.
+                'mailFrom' => $from !== '' && ! str_contains($from, '${') ? $from : null,
             ];
         })->all();
     }

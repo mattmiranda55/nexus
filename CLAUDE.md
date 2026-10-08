@@ -42,6 +42,7 @@ vendor/bin/pint            # Laravel Pint is installed (no project config); avai
 - **The app only answers on loopback hosts** (`EnsureLoopbackHost`, prepended globally). It's a DNS-rebinding guard for `/tinker` (arbitrary code execution) when served without NativePHP's secret cookie, e.g. `composer dev`. Feature tests that need another Host must use absolute URLs; the test client derives Host from the URL.
 - The main window uses `suppressNewWindows()` + `preventLeaveDomain()` because it carries the `window.Native` preload bridge. External links go through `POST /links/{key}` (allowlist in `config/nexus.php`), never `target="_blank"`.
 - JSON endpoints rely on Laravel's default exception rendering (`expectsJson()` → 422 JSON). Don't reintroduce a `shouldRenderJsonWhen` that narrows it.
+- `code` is exempt from `TrimStrings` (bootstrap/app.php): tinker runs and saved editor buffers (`projects.scratch`) must arrive verbatim.
 - `.env` should have `SESSION_DRIVER=file` and `CACHE_STORE=file` — the database drivers caused SQLite/WAL churn that also woke the Vite watcher.
 - `vite.config.js` excludes `vendor/`, `storage/` and the SQLite files from watching — keep it that way (Windows needs a watch handle per directory plus a Defender scan per hit).
 - OPcache settings live in `NativeAppServiceProvider::phpIni()`; JIT is intentionally off, and `validate_timestamps` is gated on `app.debug`.
@@ -64,7 +65,7 @@ The serializer turns the value into a typed envelope (meta + tree node + optiona
 
 Constraints on `tinker_serializer.php`: it runs in *someone else's* Laravel app, so it must stay dependency-free, global (no namespace — the emitter calls helpers by bare name), probe Laravel classes with `instanceof`, and keep everything capped (`NEXUS_MAX_*`). It is also `require`d directly by the PHPUnit suite.
 
-Every run is recorded to `runs` (last 100 per project) for history.
+The preamble's last line records `$__nexusStarted = hrtime(true)`, so the envelope's `timing.ms` covers only the user's code (`durationMs` on the response is the whole run, Laravel boot included). Every run is recorded to `runs` (last 100 per project) for history.
 
 ### Streaming via ChildProcess (logs)
 Long-lived streams never run as a Laravel request. Controllers start an Electron-side `ChildProcess` under a fixed alias (e.g. `LogController` uses `tail`), and stdout lines reach Vue via `window.Native.on(...)` `ChildProcess\MessageReceived` events. `resources/js/lib/nativeEvents.js` registers one global listener and fans out by alias (`onChildProcessMessage(alias, cb)`); `window.Native` exists only inside Electron, after `native:init`.

@@ -115,7 +115,7 @@ class MailTest extends TestCase
 
     public function test_status_picks_the_detected_catcher_and_reports_wiring_against_it(): void
     {
-        $wired = $this->tempProject('api', "MAIL_MAILER=smtp\nMAIL_PORT=2525\n");
+        $wired = $this->tempProject('api', "MAIL_MAILER=smtp\nMAIL_PORT=2525\nMAIL_FROM_ADDRESS=\"Billing@Acme.test\"\n");
         $other = $this->tempProject('blog', null);
         Http::fake(function (Request $request) {
             return match (true) {
@@ -131,8 +131,8 @@ class MailTest extends TestCase
             ->assertJsonPath('active.smtpPort', 2525)
             ->assertJsonPath('sources.0.id', 'smtp4dev|'.self::SMTP4DEV)
             ->assertJsonPath('projects', [
-                ['id' => $wired->id, 'name' => 'api', 'hasEnv' => true, 'connected' => true],
-                ['id' => $other->id, 'name' => 'blog', 'hasEnv' => false, 'connected' => false],
+                ['id' => $wired->id, 'name' => 'api', 'hasEnv' => true, 'connected' => true, 'mailFrom' => 'billing@acme.test'],
+                ['id' => $other->id, 'name' => 'blog', 'hasEnv' => false, 'connected' => false, 'mailFrom' => null],
             ]);
 
         $this->assertSame('smtp4dev', Setting::current()->mail_source['kind']);

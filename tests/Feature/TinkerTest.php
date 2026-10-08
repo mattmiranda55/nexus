@@ -68,6 +68,20 @@ class TinkerTest extends TestCase
             ->assertJsonPath('envelope.root.value', 5);
     }
 
+    public function test_the_users_code_is_timed_apart_from_laravels_boot(): void
+    {
+        $project = Project::create(['name' => 'self', 'path' => base_path()]);
+        Setting::current()->update(['active_project_id' => $project->id]);
+
+        $response = $this->post('/tinker', ['code' => 'usleep(50000); 1'])->assertOk();
+
+        $codeMs = $response->json('envelope.timing.ms');
+        $this->assertGreaterThanOrEqual(50, $codeMs);
+        $this->assertLessThan($response->json('durationMs'), $codeMs, 'The whole run includes booting Laravel');
+        $this->assertGreaterThan(0, $response->json('envelope.timing.memoryPeak'));
+        $this->assertSame('1', $response->json('raw'), 'The timing line stays out of the raw view');
+    }
+
     public function test_an_exception_is_reported_and_recorded_as_a_failed_run(): void
     {
         $project = Project::create(['name' => 'self', 'path' => base_path()]);
