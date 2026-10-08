@@ -1,134 +1,146 @@
-# Nexus (NativePHP edition)
+# Nexus
 
-A desktop tool for Laravel developers: a graphical `php artisan tinker` console
-plus a live `laravel.log` viewer. This is a port of the original Wails (Go +
-Svelte) app to a stack that's all PHP + Vue.
+A desktop companion for Laravel development. Point it at your Laravel projects and
+it gives you a graphical `php artisan tinker`, a live `laravel.log` viewer, and an
+inbox for the mail your apps send — all in one window, on macOS and Windows.
 
-## Stack
+Built with [NativePHP](https://nativephp.com) (Electron), Laravel 13, Inertia +
+Vue 3, Tailwind 4 and CodeMirror 6.
 
-- **Shell:** [NativePHP](https://nativephp.com) desktop (Electron runtime)
-- **Backend:** Laravel 13 (all app logic in PHP)
-- **Frontend:** Inertia + Vue 3, Tailwind 4, CodeMirror 6 editor
-- **Storage:** SQLite (Eloquent) — `projects` and a single-row `settings`
+## What it does
 
-> Package managers: **npm for everything JavaScript**, Composer for PHP. The
-> project used to use bun for the frontend while NativePHP's Electron runtime
-> installed with npm (its installer supports only npm/yarn) — two lockfiles and
-> two toolchains to keep working on two operating systems, for no benefit.
+### Tinker
 
-## Run it
+- **Run PHP inside any of your projects.** Code runs through that project's own
+  `php artisan tinker`, with its own `.env`, database and PHP version (Herd and
+  project-local PHP are preferred automatically).
+- **Structured results.** Collections and query results open as a sortable,
+  filterable table (with CSV/JSON export), nested data as a tree, and every SQL
+  query the snippet ran is listed — with likely N+1 queries flagged. The raw
+  tinker output is always one tab away.
+- **Run just a selection.** ⌘↵ / Ctrl+↵ runs the selected lines when there's a
+  selection, the whole buffer when there isn't.
+- **Timing.** The output shows how long your code took (Laravel's boot isn't
+  counted); hover for the whole run and peak memory.
+- **Never blocks the app.** Runs happen in a background process, so logs, mail
+  and settings stay responsive. A slow run can be stopped with the Stop button.
+- **Your buffer is kept.** Each project's editor contents are saved and come
+  back after a restart.
+- **Run history.** The last 100 runs per project, with status and duration.
+  Restoring one loads its code into the editor; nothing re-runs until you press ⌘↵.
+- **Logs from the run.** Anything a run wrote to `laravel.log` appears under its
+  output, with a "Show in Logs" link to see it in context.
+
+### Logs
+
+- Live tail of the project's `laravel.log`, parsed into entries with level
+  filters, search, collapsed repeats and expandable stack traces.
+- Click a stack frame to open it in your editor (VS Code, PhpStorm, Cursor,
+  Sublime, VSCodium or TextMate).
+- Optional desktop notification when an error is logged.
+- "Empty log file" clears `laravel.log` for a clean reproduce-and-read cycle.
+
+### Mail
+
+- **Uses the mail server you already run.** Nexus finds smtp4dev, Mailpit or
+  MailHog on your machine and shows their mail in its own inbox, so you never
+  need their web UIs. If several are running, pick one in Settings.
+- **One inbox for every project**, with each email tagged by the project that
+  sent it (matched by its `MAIL_FROM_ADDRESS`) and a filter by project.
+- **Wire projects up in one click.** The inbox shows which projects' `.env`
+  send mail to it, and a Connect button fixes the ones that don't.
+- **HTML, text and raw source views**, attachments listed, and a phone-width
+  preview for checking how a mailable looks on mobile.
+- **Desktop notifications** for new mail while Nexus isn't in front; clicking
+  one opens the message.
+- **No mail server?** Settings → Mail can download Mailpit for you (checksum
+  verified) and either start it with Nexus or start it at login — no admin
+  rights needed.
+
+## Getting started
+
+**Prerequisites:** PHP 8.3+, Composer, Node 22+. On Windows, also
+[Git for Windows](https://git-scm.com/download/win) for the log viewer (see below).
 
 ```bash
-npm run setup              # checks prerequisites, installs everything, migrates
-composer native:dev        # launches the Electron window + vite dev server
+npm run setup          # checks prerequisites, installs everything, migrates, builds
+composer native:dev    # opens the Nexus window (with the Vite dev server)
 ```
 
-`npm run setup` is idempotent — re-run it any time. It verifies PHP, Composer
-and Node are on PATH, creates `.env`, installs both dependency trees, migrates
-**both** databases (see the
-Windows notes on why there are two), and builds the frontend.
+Then click **+ Add Laravel project** and pick a project folder.
 
-After bumping `nativephp/desktop`, run `composer native:dev:deps` once to
-reinstall its Electron dependencies.
+`npm run setup` is safe to re-run at any time. It checks your PHP, Composer and
+Node versions, creates `.env`, installs Composer and npm dependencies, repairs a
+missing Electron binary, migrates both databases, and builds the frontend.
 
-`native:dev` passes `-D` to `native:run`. Without it NativePHP re-runs a full
-`npm install` inside `vendor/nativephp/desktop/resources/electron/` on **every**
-launch (`RunCommand` calls `installNPMDependencies(force: true)`, which skips
-its own confirm prompt). On macOS that's a quick no-op; on Windows it's minutes
-of pegged CPU and disk before the window even appears.
+Windows users: see [WINDOWS_SETUP.txt](WINDOWS_SETUP.txt) for Defender
+exclusions and the log-viewer shell — both make a large difference there.
 
-Tests:
+### Optional `.env` settings
+
+| Variable | Purpose |
+| --- | --- |
+| `NEXUS_PHP_PATH` | PHP binary to run tinker with (also settable in Settings) |
+| `NEXUS_GIT_BASH_PATH` | Git Bash location on Windows, if not in `%ProgramFiles%\Git` |
+| `NEXUS_SMTP4DEV_URL` | Where to look for smtp4dev (default `http://127.0.0.1:5000`) |
+| `NEXUS_MAILPIT_PATH` | Use this Mailpit binary instead of downloading one |
+| `NEXUS_MAILPIT_HOST`, `_SMTP_PORT`, `_HTTP_PORT` | Where Nexus's own Mailpit listens (default `127.0.0.1`, 1025, 8025) |
+
+## Development
 
 ```bash
-php artisan test     # backend (PHPUnit)
-npm test             # frontend (vitest) — resources/js/**/*.test.js
+composer native:dev         # run the app
+composer native:dev:deps    # after bumping nativephp/desktop: reinstall Electron deps
+php artisan native:migrate  # apply new migrations to the database the app reads
+
+php artisan test            # PHPUnit
+npm test                    # vitest (resources/js/**/*.test.js)
+npm run build               # production frontend build
 ```
 
-## Beyond the port (the Hub update)
+Use **npm** for JavaScript and **Composer** for PHP — not bun or yarn.
+NativePHP's Electron installer only supports npm.
 
-On top of the roadmap features (structured output, deep logs, workbench, mail):
+[CLAUDE.md](CLAUDE.md) is the detailed developer guide: architecture, the tinker
+pipeline, how mail detection works, and the rules below in full.
 
-- **⌘K command palette** — fuzzy switchboard over everything: tabs, workbench
-  panels, project switching, snippets, recent runs, theme/layout/settings.
-  `resources/js/Components/CommandPalette.vue` + `resources/js/lib/fuzzy.js`.
-- **Database browser** — Workbench → Database. Table list (`db:show --json`),
-  schema (`db:table --json`), and read-only row browsing that runs
-  `DB::table(...)` through the same structured tinker pipeline as the REPL.
-- **Snippet library** — save the editor buffer as a named per-project or global
-  snippet (toolbar bookmark icon), insert from the palette. Same name overwrites.
-- **Run history** — every tinker run is recorded (code, ok, duration), kept to
-  the last 100 per project. Toolbar clock icon or the palette restores old code
-  into the editor; nothing re-runs without an explicit ⌘↵.
-- **Dumps tab (Ray-style receiver)** — one click writes `VAR_DUMPER_FORMAT=server`
-  to a project's `.env`, and every `dump()`/`dd()` in that app streams live into
-  Nexus with a click-to-source link. No package needed in the target project —
-  it's plain `symfony/var-dumper` talking to `nexus:dump-server` (a ChildProcess,
-  like the log tail). Safe to leave connected: dumps fall back to normal output
-  whenever Nexus isn't running.
+### Things that will bite you
 
-After pulling: `php artisan migrate` (adds `snippets` + `runs`).
+- **Two databases.** The running app reads `database/nativephp.sqlite`; a plain
+  `php artisan migrate` writes `database/database.sqlite`. Apply new migrations
+  with `php artisan native:migrate` (setup does both).
+- **Don't `php artisan config:cache` in dev.** It bakes in "not running in
+  NativePHP" and the app silently switches to the wrong database.
+- **One request at a time.** NativePHP serves the app with PHP's built-in
+  server, and on Windows that means a single worker. Anything slow belongs in a
+  NativePHP `ChildProcess` (tinker runs, the log tail and the mail watcher
+  already are), and network checks need short timeouts.
+- **Windows is the primary target.** Development happens on macOS, but every
+  change has to work on Windows: no POSIX-only tools, separator-agnostic paths,
+  and remember npm/composer are batch shims there.
+- **Don't run `composer update` without `--no-scripts`** for routine bumps;
+  its post-update hook can overwrite NativePHP's config and service provider.
+- **No `env()` outside `config/`.** Packaged builds cache config, after which
+  `env()` returns null. Nexus's own settings live in `config/nexus.php`.
 
-## How it maps to the original Go app
+### Branches
 
-The old app exposed ~10 bound Go methods; here's where that logic now lives.
+`master` is a deliberately focused version of the app. Larger features — a ⌘K
+command palette, a Workbench (routes, models, migrations, database browser), a
+snippet library and a `dump()` receiver — live on the `future-features` branch
+and will come back once the core is solid.
+
+### History
+
+Nexus started as a Wails (Go + Svelte) app. Roughly where the old Go methods
+ended up:
 
 | Original (Go / Wails) | Now (Laravel / Vue) |
 | --- | --- |
-| `GetProjects` / `AddProject` / `RemoveProject` | `app/Http/Controllers/ProjectController.php` + `app/Models/Project.php` |
-| `GetSettings` / `UpdateSettings` | `SettingsController` + `app/Models/Setting.php` |
-| `SelectDirectory` (native picker) | `ProjectController::store()` → `Dialog::new()->folders()->open()` |
-| `RunTinker` | `TinkerController` → `app/Services/TinkerRunner.php` (Symfony Process) |
-| tinker output parsing | `app/Services/TinkerOutputParser.php` |
-| `resolvePHPBinary` (6-tier Herd fallback) | `app/Services/PhpBinaryResolver.php` |
-| `StartLogTail` / `StopLogTail` + `log:update` events | `LogController` → `ChildProcess::start('tail -n 200 -F …')`; UI receives lines via `window.Native.on(...)` (`resources/js/lib/nativeEvents.js`) |
+| `GetProjects` / `AddProject` / `RemoveProject` | `ProjectController`, `app/Models/Project.php` |
+| `GetSettings` / `UpdateSettings` | `SettingsController`, `app/Models/Setting.php` |
+| `SelectDirectory` (native picker) | `ProjectController::store()` → NativePHP `Dialog` |
+| `RunTinker` + output parsing | `TinkerController` → `TinkerExecutor` → `TinkerRunner`, `TinkerOutputParser` |
+| `resolvePHPBinary` (Herd fallback chain) | `app/Services/PhpBinaryResolver.php` |
+| `StartLogTail` / `StopLogTail` | `LogController` → a NativePHP `ChildProcess` (`LogTailCommand`) |
 | Svelte UI | `resources/js/Pages/Console.vue` + `resources/js/Components/*` |
-
-### Why the log tail uses a child process
-
-NativePHP boots the app with `php artisan serve`, which is single-threaded. A
-long-lived log stream must not run as a Laravel request or it would block the
-server. Instead the tail runs as an Electron-side child process that pushes lines
-straight to the Vue UI via `window.Native.on(...)` — no websocket, no blocking.
-
-### Load-time notes
-
-- Editor (CodeMirror) and the log viewer are lazy-loaded, so the initial JS
-  bundle is ~185KB instead of ~845KB.
-- `config/nativephp.php` `prebuild` runs `php artisan optimize` at build time;
-  OPcache is enabled in `NativeAppServiceProvider::phpIni()`. JIT is
-  deliberately off — tracing JIT bought a request-scoped Laravel app nothing and
-  cost real CPU on every cold start.
-- `opcache.validate_timestamps` is gated on `app.debug`. Frozen in a packaged
-  build, revalidating on a 2s floor in dev — otherwise edits to PHP silently do
-  nothing until the whole app restarts.
-
-### Windows notes
-
-Development happens on macOS, but Windows is the primary test target, and it is
-where the performance cliffs are. Things that are free on macOS and are not on
-Windows:
-
-- **File watching.** `vite.config.js` excludes `vendor/`, `storage/` and the
-  SQLite files from the dev watcher. macOS gets one recursive FSEvents watch;
-  Windows needs a `ReadDirectoryChangesW` handle per directory plus a Defender
-  scan per hit, and `vendor/` alone is tens of thousands of files.
-- **Defender.** Exclude the project directory and `vendor/nativephp/php-bin`.
-  Every PHP `include` is a file open, and dev mode has no config cache, so each
-  request re-reads a lot of small files.
-- **One request at a time.** NativePHP serves the app with `php -S`
-  (`php.ts` → `['-S', '127.0.0.1:<port>', server.php]`). `PHP_CLI_SERVER_WORKERS`
-  is `fork()`-based and therefore POSIX-only, so Windows can never run more than
-  one worker. Anything that blocks a request blocks the entire UI — which is why
-  `MailpitManager::detect()` uses sub-second timeouts and `MailInbox` backs off
-  instead of polling on a flat interval.
-- **Two databases.** `NativeServiceProvider::bootingPackage()` only repoints
-  `database.default` when `NATIVEPHP_RUNNING` is set, i.e. only for the PHP
-  process Electron spawns. The app reads `database/nativephp.sqlite`; a plain
-  `php artisan migrate` from your shell writes `database/database.sqlite`. Use
-  **`php artisan native:migrate`**. NativePHP only auto-migrates when the file
-  is absent, so migrations added later never run on a machine that already has
-  one.
-
-Don't run `php artisan config:cache` to speed up dev: `nativephp-internal.running`
-reads `env('NATIVEPHP_RUNNING')`, which is unset in your shell, so caching bakes
-in `false` and the app silently switches to the wrong SQLite file.
