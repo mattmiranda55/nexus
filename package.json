@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "setup": "node scripts/setup.mjs",
+        "setup:windows": "node scripts/setup-windows.mjs",
         "build": "vite build",
         "dev": "vite",
         "test": "vitest run",

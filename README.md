@@ -73,8 +73,11 @@ Then click **+ Add Laravel project** and pick a project folder.
 Node versions, creates `.env`, installs Composer and npm dependencies, repairs a
 missing Electron binary, migrates both databases, and builds the frontend.
 
-Windows users: see [WINDOWS_SETUP.txt](WINDOWS_SETUP.txt) for Defender
-exclusions and the log-viewer shell — both make a large difference there.
+**On Windows, run `npm run setup:windows` instead.** It does the same, then
+finds Git Bash for the log viewer and adds Windows Defender exclusions for the
+project (one admin prompt), asking before each change. Both make a large
+difference on Windows; [WINDOWS_SETUP.txt](WINDOWS_SETUP.txt) explains why and
+how to do them by hand.
 
 ### Optional `.env` settings
 

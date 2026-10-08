@@ -18,6 +18,7 @@ Stack: Laravel 13 (PHP 8.3+), Inertia + Vue 3, Tailwind 4, CodeMirror 6, SQLite 
 
 ```bash
 npm run setup              # idempotent: checks PHP/Composer/Node, creates .env, installs deps, migrates BOTH databases, builds frontend
+npm run setup:windows      # Windows: tidies old checkouts, runs setup, finds Git Bash (NEXUS_GIT_BASH_PATH), adds Defender exclusions (UAC); asks first, --yes to skip
 composer native:dev        # run the app: Electron window + vite dev server (passes -D to skip Electron npm reinstall)
 composer native:dev:deps   # only after bumping nativephp/desktop — reinstalls Electron deps
 php artisan native:migrate # migrate the database the running app actually reads (see "Two databases")

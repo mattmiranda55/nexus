@@ -202,21 +202,13 @@ run('npm', ['run', 'build']);
 
 // ---------------------------------------------------------------------------
 
-if (WINDOWS) {
-    log.step('Windows notes');
+// setup-windows.mjs runs this script itself and then does the Windows steps.
+if (WINDOWS && !process.env.NEXUS_SETUP_WINDOWS) {
+    log.step('Windows');
     console.log(`
-  Two things this script can't do for you:
-
-  1. Defender exclusions. Add the project folder and
-     vendor\\nativephp\\php-bin under
-     Virus & threat protection > Exclusions > Folder.
-     Every PHP include is a file open, and dev mode has no config cache.
-
-  2. A real 'tail' for the log viewer. Install Git for Windows (its bash
-     ships GNU tail), or set NEXUS_GIT_BASH_PATH in .env, or pick a
-     different log shell in Settings.
-
-  See WINDOWS_SETUP.txt for the rest.`);
+  Run  npm run setup:windows  to also add the Defender exclusions and find
+  Git Bash for the log viewer (it asks before each change).
+  See WINDOWS_SETUP.txt for what it does.`);
 }
 
 console.log(failed

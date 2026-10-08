@@ -7,15 +7,24 @@ and tells you what's missing; it won't install them for you.
 
 THE SHORT VERSION
 -----------------
-    npm run setup
+    npm run setup:windows
     composer native:dev
 
-Then do steps 1 and 2 below, which a script can't do.
+`npm run setup:windows` does everything below that a script can, asking
+before each change (add `-- --yes` to skip the questions):
 
-`npm run setup` is idempotent. It creates .env, installs Composer and npm
-dependencies, migrates both databases, and builds the frontend. Mailpit is
-no longer bundled: Nexus reads whatever mail server you already run (such as
-smtp4dev), and Settings > Mail can download Mailpit if you want one.
+  - tidies an older checkout (step 3: .env drivers, bun leftovers)
+  - runs the normal `npm run setup`: creates .env, installs Composer and npm
+    dependencies, migrates both databases, builds the frontend
+  - finds Git Bash wherever Git was installed and saves NEXUS_GIT_BASH_PATH,
+    or offers to install Git with winget (step 2)
+  - adds the Defender exclusions, behind one admin (UAC) prompt (step 1)
+
+It's safe to re-run. The steps are written out below in case you'd rather do
+them by hand, or a step fails (for example with a third-party antivirus).
+
+Mailpit is not bundled: Nexus reads whatever mail server you already run (such
+as smtp4dev), and Settings > Mail can download Mailpit if you want one.
 
 
 1. ADD WINDOWS DEFENDER EXCLUSIONS
@@ -81,11 +90,6 @@ NOTES / GOTCHAS
   on every launch. Use `native:dev:deps` only after bumping nativephp/desktop.
 
 
-STILL BROKEN (known, not fixed)
--------------------------------
-- Tinker runs block the whole UI for their duration. PHP is served by `php -S`,
-  which handles one request at a time, and PHP_CLI_SERVER_WORKERS is fork-based
-  so Windows can never have more than one worker. Needs a refactor to run tinker
-  as a ChildProcess like the log tail.
-
+STILL TO CHECK
+--------------
 - Project switching — not investigated yet.
